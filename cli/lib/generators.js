@@ -5,7 +5,7 @@ export function writeConfig(dir, config) {
   writeFileSync(join(dir, 'openclaw-office.config.json'), JSON.stringify(config, null, 2) + '\n');
 }
 
-export function writeEnv(dir, { gatewayToken, googleApiKey, anthropicApiKey, telegramWebhookSecret }) {
+export function writeEnv(dir, { gatewayToken, googleApiKey, anthropicApiKey, telegramWebhookSecret, port }) {
   const lines = [
     '# OpenClaw Office — Local Secrets',
     '# DO NOT commit this file',
@@ -14,6 +14,7 @@ export function writeEnv(dir, { gatewayToken, googleApiKey, anthropicApiKey, tel
     `GOOGLE_API_KEY=${googleApiKey || ''}`,
     `ANTHROPIC_API_KEY=${anthropicApiKey || ''}`,
     `TELEGRAM_WEBHOOK_SECRET=${telegramWebhookSecret || ''}`,
+    `PORT=${port || 4200}`,
     '',
   ];
   writeFileSync(join(dir, '.env.local'), lines.join('\n'));

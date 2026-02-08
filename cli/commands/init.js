@@ -168,8 +168,12 @@ export async function initCommand(options) {
   }
 
   // ── Deployment ──
+  const isMac = process.platform === 'darwin'
+  const isLinux = process.platform === 'linux'
+  const defaultDeploy = isMac ? 'launchd' : isLinux ? 'systemd' : 'docker'
   const { deployMethod } = await inquirer.prompt({
     type: 'list',
+    default: defaultDeploy,
     name: 'deployMethod',
     message: 'How will you run OpenClaw Office?',
     choices: DEPLOY_METHODS,
@@ -202,7 +206,7 @@ export async function initCommand(options) {
   };
 
   writeConfig(cwd, config);
-  writeEnv(cwd, { gatewayToken, googleApiKey, anthropicApiKey, telegramWebhookSecret });
+  writeEnv(cwd, { gatewayToken, googleApiKey, anthropicApiKey, telegramWebhookSecret, port });
   writeDeployConfig(cwd, deployMethod, config.deployment);
 
   genSpinner.succeed('Configuration generated!');

@@ -68,8 +68,9 @@ Detailed pixel art style, creative decorations matching the theme. High quality,
 };
 
 export function buildPrompt(agents, style, customDescription) {
-  const templateFn = STYLE_TEMPLATES[style] || STYLE_TEMPLATES.cyberpunk;
-  return templateFn(agents, customDescription);
+  const templateFn = STYLE_TEMPLATES[style] || STYLE_TEMPLATES.custom;
+  const desc = customDescription || (STYLE_TEMPLATES[style] ? undefined : `${style} style, warm and inviting`);
+  return templateFn(agents, desc);
 }
 
 export function getTemplatePositions(agentCount) {

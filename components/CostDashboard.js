@@ -3,12 +3,19 @@
 import { motion } from 'framer-motion'
 import { useState, useEffect, useRef } from 'react'
 import { TrendingUp, DollarSign, Users, Zap, Trophy, Cpu, ArrowUpRight } from 'lucide-react'
-import { agents } from '../lib/agents'
+// Agents loaded dynamically from config API
+// (no static import to avoid server-only 'fs' module on client)
 
-// Build agent lookup by id for colors/emoji/name/role
-const agentMap = {}
-for (const a of agents) {
-  agentMap[a.id] = a
+function useAgentMap() {
+  const [agentMap, setAgentMap] = useState({})
+  useEffect(() => {
+    fetch('/api/config').then(r => r.json()).then(data => {
+      const map = {}
+      for (const a of (data.agents || [])) map[a.id] = a
+      setAgentMap(map)
+    }).catch(() => {})
+  }, [])
+  return agentMap
 }
 
 function formatUSD(value) {
@@ -48,6 +55,7 @@ function AnimatedNumber({ target, format = 'number', duration = 2000 }) {
 }
 
 export default function CostDashboard() {
+  const agentMap = useAgentMap()
   const [stats, setStats] = useState(null)
   const [agentStats, setAgentStats] = useState([])
   const [loading, setLoading] = useState(true)

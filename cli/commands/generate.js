@@ -15,8 +15,12 @@ export async function generateCommand(options) {
   }
 
   const config = JSON.parse(readFileSync(configPath, 'utf-8'));
-  const agents = config.agents || [];
-  const style = options.style || config.style?.theme || 'cyberpunk';
+  // Agents can be an object {id: {...}} or array [{id, ...}] — normalize to array
+  const rawAgents = config.agents || {};
+  const agents = Array.isArray(rawAgents) 
+    ? rawAgents 
+    : Object.entries(rawAgents).map(([id, data]) => ({ id, ...data }));
+  const style = options.style || config.office?.style || config.style?.theme || 'cyberpunk';
   const customDescription = config.style?.customDescription;
 
   if (agents.length === 0) {
@@ -34,7 +38,7 @@ export async function generateCommand(options) {
     }
   }
 
-  const googleKey = envVars.GOOGLE_API_KEY || process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+  const googleKey = envVars.GEMINI_API_KEY || envVars.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
   const anthropicKey = envVars.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
 
   console.log();

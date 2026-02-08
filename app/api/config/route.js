@@ -7,9 +7,13 @@ export async function GET() {
   const config = getConfig()
 
   // Build safe public config (no tokens/secrets)
+  // Convert agents object to array with id included
+  const agentsArray = Object.entries(config.agents || {}).map(([id, data]) => ({ id, ...data }))
+
   const publicConfig = {
     office: config.office,
-    agents: config.agents,
+    agents: agentsArray,
+    agentsMap: config.agents,
     image: config.image,
   }
 

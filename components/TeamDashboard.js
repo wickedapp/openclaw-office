@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion'
 import { useState, useEffect } from 'react'
-import { agents, getAgentStats } from '../lib/agents'
+import { getAgentStats, enrichAgent } from '../lib/agents'
 
 function AgentCard({ agent }) {
   const [currentThought, setCurrentThought] = useState(0)
@@ -115,6 +115,13 @@ function AgentCard({ agent }) {
 }
 
 export default function TeamDashboard() {
+  const [agents, setAgents] = useState([])
+  useEffect(() => {
+    fetch('/api/config').then(r => r.json()).then(data => {
+      setAgents((data.agents || []).map(enrichAgent))
+    }).catch(() => {})
+  }, [])
+
   return (
     <div className="space-y-6">
       {/* Section header */}

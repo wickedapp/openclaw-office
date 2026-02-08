@@ -6,6 +6,26 @@ import { useRequestStream, useActivityStream } from '../lib/useWorkflowStream'
 import AgentTaskIndicator from './AgentTaskIndicator'
 
 // Default positions — overridden by config via /api/config
+// Auto-generate evenly spaced default positions for any number of agents
+function generateDefaultPositions(agentIds) {
+  const positions = {}
+  const layouts = {
+    1: [{ x: 50, y: 45 }],
+    2: [{ x: 35, y: 45 }, { x: 65, y: 45 }],
+    3: [{ x: 50, y: 35 }, { x: 25, y: 60 }, { x: 75, y: 60 }],
+    4: [{ x: 30, y: 35 }, { x: 70, y: 35 }, { x: 30, y: 65 }, { x: 70, y: 65 }],
+    5: [{ x: 50, y: 30 }, { x: 20, y: 45 }, { x: 80, y: 45 }, { x: 30, y: 70 }, { x: 70, y: 70 }],
+    6: [{ x: 30, y: 30 }, { x: 70, y: 30 }, { x: 15, y: 55 }, { x: 50, y: 55 }, { x: 85, y: 55 }, { x: 50, y: 78 }],
+    7: [{ x: 50, y: 28 }, { x: 20, y: 35 }, { x: 80, y: 35 }, { x: 35, y: 55 }, { x: 65, y: 55 }, { x: 22, y: 75 }, { x: 78, y: 75 }],
+  }
+  const count = agentIds.length
+  const layout = layouts[Math.min(count, 7)] || layouts[7]
+  agentIds.forEach((id, i) => {
+    positions[id] = layout[i % layout.length] || { x: 20 + (i * 15) % 60, y: 30 + (i * 12) % 50 }
+  })
+  return positions
+}
+
 const defaultPositions = {}
 
 // Agents loaded from config endpoint
@@ -345,13 +365,18 @@ export default function IsometricOffice({ activeRequest }) {
       .then(r => r.json())
       .then(config => {
         setOfficeConfig(config)
-        // Build agents array from config
-        const agentList = Object.entries(config.agents || {}).map(([id, data]) => ({ id, ...data, status: 'online' }))
+        // Build agents array from config (supports both array and object format)
+        const rawAgents = config.agents || {}
+        const agentList = Array.isArray(rawAgents)
+          ? rawAgents.map(a => ({ ...a, status: 'online' }))
+          : Object.entries(rawAgents).map(([id, data]) => ({ id, ...data, status: 'online' }))
         setAgents(agentList)
         // Build default positions from config
-        const configPositions = {}
-        for (const [id, data] of Object.entries(config.agents || {})) {
-          if (data.position) configPositions[id] = data.position
+        // Generate fallback positions for all agents
+        const generatedPositions = generateDefaultPositions(agentList.map(a => a.id))
+        const configPositions = { ...generatedPositions }
+        for (const a of agentList) {
+          if (a.position) configPositions[a.id] = a.position
         }
         const imgPositions = config.image?.positions || {}
         setLabelPositions(prev => ({ ...configPositions, ...imgPositions, ...prev }))
@@ -558,7 +583,7 @@ export default function IsometricOffice({ activeRequest }) {
     <div ref={containerRef} className="office-container relative w-full overflow-hidden rounded-xl" style={{ aspectRatio: '2816 / 1536' }}>
       {/* Office image - fills container */}
       <img 
-        src={`/sprites/office-complete.png?v=${Date.now()}`} 
+        src={`/sprites/office.png?v=${Date.now()}`} 
         alt="AI Office" 
         className="absolute inset-0 w-full h-full object-cover"
       />
@@ -569,7 +594,7 @@ export default function IsometricOffice({ activeRequest }) {
           key={agentId}
           agentId={agentId}
           task={data.task}
-          position={labelPositions[agentId] || defaultPositions[agentId]}
+          position={labelPositions[agentId] || defaultPositions[agentId] || { x: 50, y: 50 }}
           glowOnly={true}
         />
       ))}
@@ -579,7 +604,7 @@ export default function IsometricOffice({ activeRequest }) {
         <AgentLabel
           key={`${agent.id}-${dragKeys[agent.id] || 0}`}
           agent={agent}
-          position={labelPositions[agent.id] || defaultPositions[agent.id]}
+          position={labelPositions[agent.id] || defaultPositions[agent.id] || { x: 50, y: 50 }}
           onDragEnd={handleDragEnd}
           isWorking={!!workingAgents[agent.id]}
           dragKey={dragKeys[agent.id] || 0}
