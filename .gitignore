@@ -3,7 +3,11 @@ node_modules/
 .DS_Store
 data/
 data/*.db
+*.db
 .env.local
 .env
+.env.production
 public/data/
 openclaw-office.config.json
+*.log
+.vercel/
