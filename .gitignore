@@ -1,0 +1,9 @@
+node_modules/
+.next/
+.DS_Store
+data/
+data/*.db
+.env.local
+.env
+public/data/
+openclaw-office.config.json

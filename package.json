@@ -1,0 +1,31 @@
+{
+  "name": "openclaw-office",
+  "version": "0.1.0",
+  "description": "Virtual AI Office Dashboard for OpenClaw — visualize your multi-agent workflows in real-time",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wickedapp/openclaw-office.git"
+  },
+  "scripts": {
+    "dev": "next dev -p 4200",
+    "build": "next build",
+    "start": "next start -p 4200"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0",
+    "eslint-plugin-react": "^7.34.1"
+  },
+  "dependencies": {
+    "autoprefixer": "^10.4.21",
+    "better-sqlite3": "^12.6.2",
+    "framer-motion": "^12.4.7",
+    "lucide-react": "^0.474.0",
+    "next": "^15.1.6",
+    "postcss": "^8.5.2",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tailwindcss": "^3.4.17",
+    "ws": "^8.19.0"
+  }
+}

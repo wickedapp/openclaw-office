@@ -1,0 +1,232 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;900&family=JetBrains+Mono:wght@300;400;500;600;700&family=Press+Start+2P&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --cyber-dark: #0a0a0f;
+  --cyber-darker: #050508;
+  --cyber-purple: #9d4edd;
+  --cyber-pink: #ff006e;
+  --cyber-cyan: #00f5ff;
+  --cyber-green: #39ff14;
+  --cyber-yellow: #ffd700;
+  --cyber-orange: #ff6b35;
+  --cyber-red: #ff0040;
+  --grid-color: rgba(0, 245, 255, 0.05);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--cyber-darker);
+  color: #e0e0e0;
+  font-family: 'JetBrains Mono', monospace;
+  overflow-x: hidden;
+}
+
+/* Cyberpunk Grid Background */
+.cyber-grid {
+  background-image: 
+    linear-gradient(var(--grid-color) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+  background-size: 50px 50px;
+  background-position: center;
+}
+
+/* Scanlines effect */
+.scanlines::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.15),
+    rgba(0, 0, 0, 0.15) 1px,
+    transparent 1px,
+    transparent 2px
+  );
+  pointer-events: none;
+  z-index: 100;
+}
+
+/* Neon glow effects */
+.neon-cyan {
+  text-shadow: 0 0 5px var(--cyber-cyan), 0 0 10px var(--cyber-cyan), 0 0 20px var(--cyber-cyan);
+}
+
+.neon-pink {
+  text-shadow: 0 0 5px var(--cyber-pink), 0 0 10px var(--cyber-pink), 0 0 20px var(--cyber-pink);
+}
+
+.neon-green {
+  text-shadow: 0 0 5px var(--cyber-green), 0 0 10px var(--cyber-green), 0 0 20px var(--cyber-green);
+}
+
+.neon-purple {
+  text-shadow: 0 0 5px var(--cyber-purple), 0 0 10px var(--cyber-purple), 0 0 20px var(--cyber-purple);
+}
+
+/* Neon border glow */
+.neon-border-cyan {
+  box-shadow: 0 0 5px var(--cyber-cyan), 0 0 10px var(--cyber-cyan), inset 0 0 5px rgba(0, 245, 255, 0.1);
+  border: 1px solid var(--cyber-cyan);
+}
+
+.neon-border-pink {
+  box-shadow: 0 0 5px var(--cyber-pink), 0 0 10px var(--cyber-pink), inset 0 0 5px rgba(255, 0, 110, 0.1);
+  border: 1px solid var(--cyber-pink);
+}
+
+.neon-border-green {
+  box-shadow: 0 0 5px var(--cyber-green), 0 0 10px var(--cyber-green), inset 0 0 5px rgba(57, 255, 20, 0.1);
+  border: 1px solid var(--cyber-green);
+}
+
+.neon-border-purple {
+  box-shadow: 0 0 5px var(--cyber-purple), 0 0 10px var(--cyber-purple), inset 0 0 5px rgba(157, 78, 221, 0.1);
+  border: 1px solid var(--cyber-purple);
+}
+
+/* Glitch effect */
+@keyframes glitch {
+  0%, 90%, 100% { transform: translate(0); }
+  92% { transform: translate(-2px, 1px); }
+  94% { transform: translate(2px, -1px); }
+  96% { transform: translate(-1px, 2px); }
+  98% { transform: translate(1px, -2px); }
+}
+
+.glitch:hover {
+  animation: glitch 0.3s ease-in-out;
+}
+
+/* Isometric transformation */
+.isometric {
+  transform: rotateX(60deg) rotateZ(-45deg);
+  transform-style: preserve-3d;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--cyber-darker);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--cyber-purple);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--cyber-pink);
+}
+
+/* Activity log scroll */
+.activity-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--cyber-cyan) var(--cyber-dark);
+}
+
+/* Pixel art rendering */
+.pixel-art {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* Card glass effect */
+.glass-card {
+  background: linear-gradient(135deg, rgba(10, 10, 15, 0.9), rgba(20, 20, 30, 0.8));
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(157, 78, 221, 0.3);
+}
+
+/* Animated gradient border */
+.gradient-border {
+  position: relative;
+  background: var(--cyber-dark);
+}
+
+.gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  background: linear-gradient(45deg, var(--cyber-cyan), var(--cyber-purple), var(--cyber-pink), var(--cyber-cyan));
+  background-size: 400% 400%;
+  animation: gradient-rotate 3s linear infinite;
+  border-radius: inherit;
+  z-index: -1;
+}
+
+@keyframes gradient-rotate {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Status indicator */
+.status-online {
+  background: var(--cyber-green);
+  box-shadow: 0 0 10px var(--cyber-green);
+  animation: pulse 2s infinite;
+}
+
+.status-busy {
+  background: var(--cyber-orange);
+  box-shadow: 0 0 10px var(--cyber-orange);
+  animation: pulse 1s infinite;
+}
+
+.status-offline {
+  background: #666;
+}
+
+/* Typing animation for agent thoughts */
+.typing-cursor::after {
+  content: '▊';
+  animation: blink 1s infinite;
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+/* Rain effect background */
+.cyber-rain {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.03;
+  background: repeating-linear-gradient(
+    180deg,
+    transparent 0px,
+    transparent 20px,
+    var(--cyber-cyan) 20px,
+    var(--cyber-cyan) 21px
+  );
+  animation: rain 0.5s linear infinite;
+}
+
+@keyframes rain {
+  0% { background-position: 0 0; }
+  100% { background-position: 0 21px; }
+}

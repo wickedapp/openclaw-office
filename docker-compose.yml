@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  openclaw-office:
+    build: .
+    ports:
+      - "4200:4200"
+    volumes:
+      - ./data:/app/data
+      - ./openclaw-office.config.json:/app/openclaw-office.config.json:ro
+      - ./public/sprites:/app/public/sprites:ro
+    env_file:
+      - .env.local
+    restart: unless-stopped
