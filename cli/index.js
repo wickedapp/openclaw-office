@@ -6,6 +6,7 @@ import { initCommand } from './commands/init.js';
 import { startCommand } from './commands/start.js';
 import { statusCommand } from './commands/status.js';
 import { agentsCommand } from './commands/agents.js';
+import { generateCommand } from './commands/generate.js';
 
 const program = new Command();
 
@@ -35,6 +36,12 @@ program
   .command('agents')
   .description('List configured agents')
   .action(agentsCommand);
+
+program
+  .command('generate')
+  .description('Generate or regenerate office image')
+  .option('-s, --style <style>', 'Override style (cyberpunk, minimalist, cozy, corporate, custom)')
+  .action(generateCommand);
 
 // Graceful Ctrl+C
 process.on('SIGINT', () => {

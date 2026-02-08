@@ -4,6 +4,8 @@ import ora from 'ora';
 import { resolve } from 'path';
 import { connectGateway } from '../lib/gateway.js';
 import { writeConfig, writeEnv, writeDeployConfig } from '../lib/generators.js';
+import { generateOfficeImage } from '../lib/image-gen.js';
+import { detectPositions } from '../lib/position-detect.js';
 
 const STYLES = [
   { name: '🎮 Cyberpunk / Pixel Art (neon lights, dark theme)', value: 'cyberpunk' },
@@ -133,6 +135,19 @@ export async function initCommand(options) {
     console.log(chalk.dim('  Skipped — will use default office image.'));
   }
 
+  // ── Anthropic API Key (optional, for position detection) ──
+  const { anthropicApiKey } = await inquirer.prompt({
+    type: 'password',
+    name: 'anthropicApiKey',
+    message: 'Anthropic API Key for position detection (Enter to skip):',
+    mask: '•',
+    default: '',
+  });
+
+  if (!anthropicApiKey) {
+    console.log(chalk.dim('  Skipped — will use template positions.'));
+  }
+
   // ── Telegram ──
   const { enableTelegram } = await inquirer.prompt({
     type: 'confirm',
@@ -187,10 +202,44 @@ export async function initCommand(options) {
   };
 
   writeConfig(cwd, config);
-  writeEnv(cwd, { gatewayToken, googleApiKey, telegramWebhookSecret });
+  writeEnv(cwd, { gatewayToken, googleApiKey, anthropicApiKey, telegramWebhookSecret });
   writeDeployConfig(cwd, deployMethod, config.deployment);
 
   genSpinner.succeed('Configuration generated!');
+
+  // ── Image Generation ──
+  let agentPositions = {};
+  if (agents.length > 0) {
+    const imgSpinner = ora('🎨 Generating your office scene...').start();
+    const imgResult = await generateOfficeImage({
+      agents: config.agents,
+      style,
+      customDescription: customStyleDescription,
+      apiKey: googleApiKey,
+      cwd,
+    });
+
+    if (imgResult.generated) {
+      imgSpinner.succeed('Office image generated!');
+    } else {
+      imgSpinner.info(chalk.dim(`Using default image${imgResult.error ? ` (${imgResult.error})` : ''}`));
+    }
+
+    const posSpinner = ora('🔍 Detecting agent positions...').start();
+    agentPositions = await detectPositions(imgResult.imagePath, config.agents, {
+      anthropicApiKey,
+    });
+
+    const detected = Object.values(agentPositions).filter(p => p.detected).length;
+    if (detected > 0) {
+      posSpinner.succeed(`Detected ${detected}/${config.agents.length} agent positions`);
+    } else {
+      posSpinner.info('Using template positions');
+    }
+
+    config.agentPositions = agentPositions;
+    writeConfig(cwd, config);
+  }
 
   // ── Summary ──
   const deployLabel = DEPLOY_METHODS.find((d) => d.value === deployMethod)?.name || deployMethod;
