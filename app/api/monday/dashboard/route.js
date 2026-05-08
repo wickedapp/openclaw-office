@@ -25,6 +25,7 @@ export async function POST(request) {
       const decision = routeAction({ ...task, source: body.source || task.source || 'dashboard' }, {
         source: body.source || task.source || 'dashboard',
         approval: body.approval || null,
+        liveMutationApproval: body.liveMutationApproval || body.live_mutation_approval || null,
         preflight: body.preflight || null,
         executionMode: 'decision_only',
       })

@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
+import DepartmentProgressPanel from './DepartmentProgressPanel'
+import StatusReadoutPanel from './StatusReadoutPanel'
 
 const REFRESH_MS = 15000
 
@@ -50,6 +52,7 @@ function ItemList({ title, items, render, emptyText }) {
 
 export default function MondayDashboard() {
   const [snap, setSnap] = useState(null)
+  const [statusSnap, setStatusSnap] = useState(null)
   const [error, setError] = useState(null)
 
   const load = useCallback(async () => {
@@ -57,7 +60,11 @@ export default function MondayDashboard() {
       const r = await fetch('/api/monday/dashboard')
       if (!r.ok) throw new Error(`HTTP ${r.status}`)
       const j = await r.json()
+      const statusResponse = await fetch('/api/monday/status')
+      if (!statusResponse.ok) throw new Error(`status HTTP ${statusResponse.status}`)
+      const statusJson = await statusResponse.json()
       setSnap(j)
+      setStatusSnap(statusJson)
       setError(null)
     } catch (e) {
       setError(e.message)
@@ -136,6 +143,43 @@ export default function MondayDashboard() {
             ? <div className="text-xs text-gray-500">No source data.</div>
             : Object.entries(health).map(([k, v]) => <HealthRow key={k} name={k} info={v} />)}
         </div>
+      </div>
+
+      <StatusReadoutPanel snapshot={statusSnap} />
+
+      <DepartmentProgressPanel
+        departments={statusSnap?.departments || []}
+        workflows={statusSnap?.workflows || []}
+      />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <ItemList
+          title="Workflow Status Registry"
+          items={statusSnap?.workflows}
+          emptyText="No workflow registry entries."
+          render={(w) => (
+            <div>
+              <div className="font-mono text-cyan-300">{w.id} · {w.department}</div>
+              <div className="text-gray-500">allowed={(w.allowed_actions || []).join(', ') || 'none'}</div>
+              <div className="text-gray-600 truncate">{w.repo_path}</div>
+            </div>
+          )}
+        />
+        <ItemList
+          title="Blocked Actions / Manual Input"
+          items={(statusSnap?.manualInputRequired || []).map((m) => ({
+            ...m,
+            blocked: statusSnap?.blockedActions || [],
+          }))}
+          emptyText="No manual-input registry entries."
+          render={(m) => (
+            <div>
+              <div className="font-mono text-amber-300">{m.id}</div>
+              <div className="text-gray-500">{m.whyManual}</div>
+              <div className="text-gray-600">{m.exactAction}</div>
+            </div>
+          )}
+        />
       </div>
     </motion.div>
   )

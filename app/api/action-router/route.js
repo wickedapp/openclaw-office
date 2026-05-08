@@ -19,6 +19,7 @@ export async function POST(request) {
     const context = {
       source: body.source || input.source || 'dashboard',
       approval: body.approval || input.approval || null,
+      liveMutationApproval: body.liveMutationApproval || body.live_mutation_approval || input.liveMutationApproval || input.live_mutation_approval || null,
       preflight: body.preflight || input.preflight || null,
       executionMode: 'decision_only',
     }

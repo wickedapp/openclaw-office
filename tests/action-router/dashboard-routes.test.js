@@ -54,7 +54,7 @@ ta('Monday dispatch read-only planning routes to main', async () => {
   assert.equal(data.routeDecision.mutationPermission, false)
 })
 
-ta('Monday dispatch Google Sheet mutation is pending approval', async () => {
+ta('Monday dispatch Google Sheet mutation is blocked by live gate', async () => {
   const response = await dispatchPOST(req({
     action: 'plan',
     task: { title: 'update Google Sheet schema', status: 'New' },
@@ -63,7 +63,8 @@ ta('Monday dispatch Google Sheet mutation is pending approval', async () => {
   assert.equal(data.routeDecision.selectedAgent, 'network-runner')
   assert.equal(data.routeDecision.approvalRequired, true)
   assert.equal(data.routeDecision.preflightRequired, true)
-  assert.equal(data.routeDecision.executionStatus, 'pending_approval')
+  assert.equal(data.routeDecision.executionStatus, 'blocked')
+  assert.equal(data.routeDecision.liveMutationGate.allowed, false)
 })
 
 ta('Dashboard route shows blocker on preflight fail', async () => {
@@ -71,6 +72,14 @@ ta('Dashboard route shows blocker on preflight fail', async () => {
     action: 'route',
     task: { text: 'append row to Google Sheet' },
     approval: { status: 'approved' },
+    liveMutationApproval: {
+      explicit_approval_phrase: 'I approve this exact live mutation',
+      exact_target: 'test spreadsheet',
+      exact_action: 'google_sheet_write',
+      rollback_owner: 'owner',
+      environment_confirmation: 'local dry-run only',
+      dry_run_validation_result: 'pass',
+    },
     preflight: { verdict: 'BLOCKED', blockedReason: 'dns_failed' },
   }))
   const data = await response.json()
