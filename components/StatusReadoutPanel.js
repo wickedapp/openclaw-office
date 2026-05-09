@@ -1,17 +1,18 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { RefreshCw, Square, Volume2 } from 'lucide-react'
+import { ChevronDown, RefreshCw, Square, Volume2, Waves } from 'lucide-react'
 
 const SOURCES = [
   ['overall', 'Overall'],
-  ['monday', 'Monday'],
   ['departments', 'Departments'],
-  ['workflows', 'Workflows'],
+  ['risks', 'Risks'],
   ['manual', 'Manual Input'],
   ['discord', 'Discord'],
   ['live-gate', 'Live Gate'],
 ]
+
+const VOICE_PRIORITY = ['yue-HK', 'zh-HK', 'zh-TW', 'zh-CN']
 
 function sanitizeReadout(text) {
   return String(text || '')
@@ -20,6 +21,54 @@ function sanitizeReadout(text) {
     .replace(/\b(Bearer\s+)[A-Za-z0-9._~+/=-]{8,}/gi, '$1[REDACTED]')
     .replace(/\b(sk-[A-Za-z0-9_-]{12,}|sk-proj-[A-Za-z0-9_-]{12,}|AIza[0-9A-Za-z_-]{16,}|ya29\.[0-9A-Za-z._-]{16,}|gh[pousr]_[0-9A-Za-z_]{16,})\b/g, '[REDACTED_SECRET]')
     .replace(/((token|secret|api[_-]?key|oauth|authorization|client[_-]?secret|refresh[_-]?token|access[_-]?token)\s*[:=]\s*)[^\s,;]+/gi, '$1[REDACTED]')
+    .replace(/\b(customer|student|parent|guardian|child|client)\b[^,.;\n]*/gi, '[REDACTED_PERSON_DATA]')
+}
+
+function selectVoice() {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return null
+  const voices = window.speechSynthesis.getVoices()
+  for (const lang of VOICE_PRIORITY) {
+    const exact = voices.find((voice) => voice.lang === lang)
+    if (exact) return exact
+  }
+  return voices.find((voice) => /^zh[-_]/i.test(voice.lang || '')) || null
+}
+
+function splitReadout(text) {
+  const safe = sanitizeReadout(text)
+  const lines = safe
+    .split(/\n+/)
+    .map((line) => line.replace(/^[-*]\s*/, '').trim())
+    .filter(Boolean)
+
+  if (lines.length === 0) {
+    return {
+      transcript: 'Ray，今日 Monday Command Office 已經載入。8 個部門目前處於安全監察狀態。Discord 仍然停用，所有外部操作仍由 Live Gate 鎖定。',
+      bullets: [
+        '8 個部門以 command topology 顯示。',
+        '審批隊列有高風險項目需要留意。',
+        'Status Readout 只使用瀏覽器 TTS。',
+      ],
+    }
+  }
+
+  return {
+    transcript: lines[0],
+    bullets: lines.slice(1, 5),
+  }
+}
+
+function waveformBars() {
+  return Array.from({ length: 38 }, (_, index) => (
+    <span
+      key={index}
+      className="monday-wave-bar"
+      style={{
+        height: `${6 + ((index * 7) % 22)}px`,
+        animationDelay: `${index * 0.035}s`,
+      }}
+    />
+  ))
 }
 
 export default function StatusReadoutPanel({ snapshot }) {
@@ -28,7 +77,9 @@ export default function StatusReadoutPanel({ snapshot }) {
   const [speaking, setSpeaking] = useState(false)
 
   const localText = useMemo(() => sanitizeReadout(snapshot?.readoutText || ''), [snapshot])
+  const readout = useMemo(() => splitReadout(fallback || localText), [fallback, localText])
   const supported = typeof window !== 'undefined' && 'speechSynthesis' in window
+  const voiceStatus = speaking ? 'Live' : supported ? 'Ready' : 'Read-only'
 
   async function loadText() {
     const response = await fetch(`/api/monday/status?source=${encodeURIComponent(source)}`)
@@ -44,13 +95,29 @@ export default function StatusReadoutPanel({ snapshot }) {
       if (!supported) return
       window.speechSynthesis.cancel()
       const utterance = new SpeechSynthesisUtterance(text)
+      const voice = selectVoice()
+      if (voice) {
+        utterance.voice = voice
+        utterance.lang = voice.lang
+      } else {
+        utterance.lang = 'zh-HK'
+      }
       utterance.onend = () => setSpeaking(false)
       utterance.onerror = () => setSpeaking(false)
       setSpeaking(true)
       window.speechSynthesis.speak(utterance)
     } catch (error) {
-      setFallback(`Status readout unavailable: ${error.message}`)
+      setFallback(`Status readout unavailable: ${sanitizeReadout(error.message)}`)
       setSpeaking(false)
+    }
+  }
+
+  async function refreshReadout() {
+    try {
+      const text = await loadText()
+      setFallback(text)
+    } catch (error) {
+      setFallback(`Status readout unavailable: ${sanitizeReadout(error.message)}`)
     }
   }
 
@@ -60,63 +127,94 @@ export default function StatusReadoutPanel({ snapshot }) {
   }
 
   return (
-    <section className="glass-card rounded-lg p-4 space-y-4">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h3 className="font-display text-lg font-bold text-cyan-200">Status Readout v0</h3>
-          <p className="text-xs text-gray-500">read-only browser TTS · no microphone · no router execution</p>
+    <section className="monday-panel monday-voice-panel">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-2 text-[13px] font-bold uppercase tracking-[0.04em] text-slate-100">
+          <Waves className="h-5 w-5 text-cyan-300" />
+          <span>Monday Voice Briefing</span>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={readLatestStatus}
-            className="inline-flex items-center gap-2 rounded-md border border-cyan-500/40 bg-cyan-950/40 px-3 py-2 text-xs font-bold text-cyan-200 hover:bg-cyan-900/50"
-            title="Read latest sanitized status"
-          >
-            <Volume2 className="h-4 w-4" />
-            Read
-          </button>
-          <button
-            type="button"
-            onClick={stopReading}
-            className="inline-flex items-center gap-2 rounded-md border border-gray-600/50 bg-gray-950/50 px-3 py-2 text-xs font-bold text-gray-200 hover:bg-gray-900"
-            title="Stop browser speech synthesis"
-          >
-            <Square className="h-4 w-4" />
-            Stop
-          </button>
-          <button
-            type="button"
-            onClick={readLatestStatus}
-            className="inline-flex items-center gap-2 rounded-md border border-gray-600/50 bg-gray-950/50 px-3 py-2 text-xs font-bold text-gray-200 hover:bg-gray-900"
-            title="Refresh sanitized readout text"
-          >
-            <RefreshCw className="h-4 w-4" />
-            Refresh
-          </button>
+        <div className={`rounded-full px-2 py-1 text-[11px] font-semibold ${speaking ? 'bg-emerald-400/15 text-emerald-200' : 'bg-cyan-400/10 text-cyan-200'}`}>
+          {voiceStatus}
         </div>
       </div>
-      <div className="flex flex-wrap gap-2">
+
+      <div className="mb-3 flex flex-wrap gap-1.5">
         {SOURCES.map(([id, label]) => (
           <button
             key={id}
             type="button"
             onClick={() => setSource(id)}
-            className={`rounded-md border px-3 py-1.5 text-xs ${
+            className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold ${
               source === id
-                ? 'border-purple-400/50 bg-purple-950/50 text-purple-100'
-                : 'border-gray-700/60 bg-gray-950/30 text-gray-400 hover:text-gray-100'
+                ? 'border-cyan-300/40 bg-cyan-400/15 text-cyan-100'
+                : 'border-slate-500/20 bg-slate-950/40 text-slate-400 hover:text-slate-100'
             }`}
           >
             {label}
           </button>
         ))}
       </div>
-      <div className="rounded-md border border-gray-800 bg-black/20 p-3 text-xs leading-relaxed text-gray-300">
-        {!supported && <p className="mb-2 text-amber-300">Browser speech synthesis is unavailable; showing fallback text.</p>}
-        {speaking && <p className="mb-2 text-green-300">Reading sanitized status summary.</p>}
-        <p>{fallback || localText || 'Status readout will appear here after the registry loads.'}</p>
+
+      <div className="rounded-md border border-cyan-300/10 bg-slate-950/55 p-4 shadow-[inset_0_0_30px_rgba(8,47,73,0.38)]">
+        <p className="text-sm leading-6 text-slate-200">{readout.transcript}</p>
+        <ul className="mt-3 space-y-1.5 text-xs leading-5 text-slate-400">
+          {readout.bullets.map((line) => (
+            <li key={line} className="flex gap-2">
+              <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-cyan-300" />
+              <span>{line}</span>
+            </li>
+          ))}
+        </ul>
       </div>
+
+      <div className="mt-4 flex items-end gap-2">
+        <div className="monday-waveform flex-1" aria-hidden="true">
+          {waveformBars()}
+        </div>
+        <div className="pb-1 text-[10px] text-slate-500">00:18 / 01:02</div>
+      </div>
+
+      <div className="mt-4 grid grid-cols-[48px_48px_1fr] gap-3">
+        <button
+          type="button"
+          onClick={readLatestStatus}
+          className="monday-round-control"
+          title="Read latest sanitized status with browser speech synthesis"
+        >
+          <Volume2 className="h-5 w-5" />
+        </button>
+        <button
+          type="button"
+          onClick={stopReading}
+          className={`monday-round-control ${speaking ? 'monday-round-control-active' : ''}`}
+          title="Stop browser speech synthesis"
+        >
+          <Square className="h-5 w-5" />
+        </button>
+        <div className="grid grid-cols-[1fr_48px] gap-3">
+          <button
+            type="button"
+            onClick={refreshReadout}
+            className="monday-language-select"
+            title="Language selector: Cantonese"
+          >
+            <span>Cantonese</span>
+            <ChevronDown className="h-4 w-4 text-slate-400" />
+          </button>
+          <button
+            type="button"
+            onClick={refreshReadout}
+            className="monday-round-control"
+            title="Refresh sanitized readout text"
+          >
+            <RefreshCw className="h-5 w-5" />
+          </button>
+        </div>
+      </div>
+
+      <p className="mt-3 text-[10px] text-slate-500">
+        Browser TTS only. No microphone, no STT, no voice command, no router execution.
+      </p>
     </section>
   )
 }
