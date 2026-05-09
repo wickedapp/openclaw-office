@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ChevronDown, RefreshCw, Square, Volume2, Waves } from 'lucide-react'
 
 const SOURCES = [
@@ -75,11 +75,16 @@ export default function StatusReadoutPanel({ snapshot }) {
   const [source, setSource] = useState('overall')
   const [fallback, setFallback] = useState('')
   const [speaking, setSpeaking] = useState(false)
+  const [panelNotice, setPanelNotice] = useState('總覽匯報已就緒。')
+  const [supported, setSupported] = useState(false)
 
   const localText = useMemo(() => sanitizeReadout(snapshot?.readoutText || ''), [snapshot])
   const readout = useMemo(() => splitReadout(fallback || localText), [fallback, localText])
-  const supported = typeof window !== 'undefined' && 'speechSynthesis' in window
   const voiceStatus = speaking ? '即時' : supported ? '就緒' : '只讀'
+
+  useEffect(() => {
+    setSupported(typeof window !== 'undefined' && 'speechSynthesis' in window)
+  }, [])
 
   async function loadText() {
     const response = await fetch(`/api/monday/status?source=${encodeURIComponent(source)}`)
@@ -90,9 +95,13 @@ export default function StatusReadoutPanel({ snapshot }) {
 
   async function readLatestStatus() {
     try {
+      setPanelNotice('正在載入最新已清理狀態，準備以瀏覽器 TTS 讀出。')
       const text = await loadText()
       setFallback(text)
-      if (!supported) return
+      if (!supported) {
+        setPanelNotice('瀏覽器未支援 TTS；匯報文字已更新為只讀。')
+        return
+      }
       window.speechSynthesis.cancel()
       const utterance = new SpeechSynthesisUtterance(text)
       const voice = selectVoice()
@@ -105,25 +114,36 @@ export default function StatusReadoutPanel({ snapshot }) {
       utterance.onend = () => setSpeaking(false)
       utterance.onerror = () => setSpeaking(false)
       setSpeaking(true)
+      setPanelNotice('瀏覽器 TTS 正在讀出最新狀態。')
       window.speechSynthesis.speak(utterance)
     } catch (error) {
       setFallback(`Status Readout 暫時未能載入：${sanitizeReadout(error.message)}`)
+      setPanelNotice('Status Readout 暫時未能載入，請稍後再刷新。')
       setSpeaking(false)
     }
   }
 
   async function refreshReadout() {
     try {
+      setPanelNotice('正在刷新已清理匯報文字。')
       const text = await loadText()
       setFallback(text)
+      setPanelNotice('匯報文字已刷新；未觸發任何外部操作。')
     } catch (error) {
       setFallback(`Status Readout 暫時未能載入：${sanitizeReadout(error.message)}`)
+      setPanelNotice('刷新失敗；安全狀態保持只讀。')
     }
   }
 
   function stopReading() {
     if (supported) window.speechSynthesis.cancel()
     setSpeaking(false)
+    setPanelNotice('語音播放已停止。')
+  }
+
+  function selectSource(id, label) {
+    setSource(id)
+    setPanelNotice(`${label}匯報已選取；按刷新可重新載入該段 readout。`)
   }
 
   return (
@@ -143,7 +163,8 @@ export default function StatusReadoutPanel({ snapshot }) {
           <button
             key={id}
             type="button"
-            onClick={() => setSource(id)}
+            onClick={() => selectSource(id, label)}
+            aria-pressed={source === id}
             className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold ${
               source === id
                 ? 'border-cyan-300/40 bg-cyan-400/15 text-cyan-100'
@@ -154,6 +175,8 @@ export default function StatusReadoutPanel({ snapshot }) {
           </button>
         ))}
       </div>
+
+      <div className="monday-control-feedback" aria-live="polite">{panelNotice}</div>
 
       <div className="max-h-[156px] overflow-hidden rounded-md border border-cyan-300/10 bg-slate-950/55 p-3 shadow-[inset_0_0_30px_rgba(8,47,73,0.38)]">
         <p className="text-xs leading-5 text-slate-200">{readout.transcript}</p>
@@ -194,7 +217,10 @@ export default function StatusReadoutPanel({ snapshot }) {
         <div className="grid grid-cols-[1fr_48px] gap-3">
           <button
             type="button"
-            onClick={refreshReadout}
+            onClick={() => {
+              setPanelNotice('廣東話為目前啟用語言；正在刷新匯報。')
+              refreshReadout()
+            }}
             className="monday-language-select"
             title="語言選擇：廣東話"
           >

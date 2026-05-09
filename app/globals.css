@@ -352,6 +352,14 @@ body {
   box-shadow: inset 3px 0 0 rgba(34, 211, 238, 0.9), 0 0 24px rgba(34, 211, 238, 0.12);
 }
 
+.monday-nav-item:focus-visible,
+.monday-panel-action:focus-visible,
+.monday-round-control:focus-visible,
+.monday-language-select:focus-visible {
+  outline: 2px solid rgba(125, 211, 252, 0.9);
+  outline-offset: 2px;
+}
+
 .monday-command-topbar {
   grid-column: 1 / 4;
   grid-row: 1;
@@ -395,7 +403,7 @@ body {
   grid-row: 2;
   display: grid;
   min-height: 0;
-  grid-template-rows: minmax(304px, 0.93fr) minmax(320px, 1.07fr);
+  grid-template-rows: minmax(0, 0.93fr) minmax(0, 1.07fr);
   gap: 14px;
 }
 
@@ -429,6 +437,39 @@ body {
   background:
     linear-gradient(90deg, transparent, rgba(125, 211, 252, 0.12), transparent) top left / 100% 1px no-repeat,
     linear-gradient(180deg, transparent, rgba(125, 211, 252, 0.08), transparent) top left / 1px 100% no-repeat;
+}
+
+.monday-panel-action {
+  border-radius: 999px;
+  border: 1px solid rgba(34, 211, 238, 0.18);
+  background: rgba(8, 47, 73, 0.28);
+  padding: 4px 9px;
+  color: #67e8f9;
+  font-size: 11px;
+  font-weight: 700;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+}
+
+.monday-panel-action:hover {
+  border-color: rgba(125, 211, 252, 0.42);
+  background: rgba(14, 165, 233, 0.22);
+  color: #ecfeff;
+  box-shadow: 0 0 16px rgba(14, 165, 233, 0.18);
+}
+
+.monday-command-focus {
+  position: absolute;
+  left: 50%;
+  top: 10px;
+  z-index: 8;
+  width: min(430px, calc(100% - 32px));
+  transform: translateX(-50%);
+  border: 1px solid rgba(34, 211, 238, 0.22);
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(2, 12, 25, 0.78), rgba(3, 7, 18, 0.64));
+  padding: 8px 11px;
+  box-shadow: 0 0 24px rgba(14, 165, 233, 0.14), inset 0 0 20px rgba(14, 165, 233, 0.05);
+  backdrop-filter: blur(10px);
 }
 
 .monday-topology {
@@ -734,6 +775,22 @@ body {
   font-weight: 700;
 }
 
+.monday-language-select:hover {
+  border-color: rgba(125, 211, 252, 0.38);
+  background: rgba(14, 165, 233, 0.18);
+}
+
+.monday-control-feedback {
+  margin-bottom: 10px;
+  border: 1px solid rgba(34, 211, 238, 0.14);
+  border-radius: 7px;
+  background: rgba(8, 47, 73, 0.22);
+  padding: 7px 9px;
+  color: #bae6fd;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 @keyframes monday-core-pulse {
   0%, 100% { transform: scale(1); filter: brightness(1); }
   50% { transform: scale(1.025); filter: brightness(1.16); }
@@ -858,5 +915,9 @@ body {
   .topology-radar,
   .topology-footer-note {
     display: none;
+  }
+
+  .monday-command-focus {
+    top: 12px;
   }
 }

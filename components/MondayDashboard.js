@@ -48,6 +48,59 @@ const NAV_ITEMS = [
   { id: 'settings', label: '設定', icon: Settings },
 ]
 
+const COMMAND_DETAILS = {
+  command: {
+    title: '指揮中心總覽',
+    description: 'Monday Core 正在顯示所有部門、審批、風險與安全狀態。',
+    bullets: ['8 個部門 pod 已連接中央 core。', 'Gateway 狀態以只讀方式載入。', 'Live Gate 預設保持鎖定。'],
+  },
+  departments: {
+    title: '部門監察',
+    description: '中央 topology 已聚焦部門運作狀態、待處理數量與最新 checkpoint。',
+    bullets: ['PM、審批、市場、創意、Code、Sales、教學、Ops 均保持可視。', '風險以高／中／低顯示。', '部門資料只作 read-only display。'],
+  },
+  workflows: {
+    title: '工作流狀態',
+    description: 'Workflow registry 正以 summary 方式映射到各 department pods。',
+    bullets: ['不顯示 raw registry dump。', '工作流數量與 checkpoint 已壓縮顯示。', '不執行 router mutation。'],
+  },
+  'live-gate': {
+    title: 'Live Gate 已鎖定',
+    description: '所有外部操作維持 blocked-by-default，需要審批先可以進一步處理。',
+    bullets: ['Telegram notification 仍被 gate 攔截。', 'Discord send 仍被封鎖。', 'Deploy / Publish / Scheduler / Sheet write 仍被封鎖。'],
+  },
+  sources: {
+    title: '資料來源狀態',
+    description: '來源健康狀態已轉成 action-oriented label，避免一堆 unknown。',
+    bullets: ['Gateway 在線。', 'Discord 已刻意停用。', 'Sheets 只讀；Threads 已鎖定。'],
+  },
+  risks: {
+    title: '風險佇列',
+    description: '高風險項目集中於右側審批摘要，方便先處理 approval gate。',
+    bullets: ['Production publish 需要審批。', '外部 API 存取需要人工確認。', 'Live 資料寫入仍受保護。'],
+  },
+  'manual-input': {
+    title: '人手處理',
+    description: '需要人手輸入或審批的項目已在 top pill、右側摘要與底部活動紀錄同步顯示。',
+    bullets: ['目前最少 3 個人手處理項目。', '不會自動發送通知。', '不會寫入外部系統。'],
+  },
+  logs: {
+    title: '活動紀錄',
+    description: '底部活動紀錄保留最近 operational events，只顯示短摘要。',
+    bullets: ['事件文字已 sanitize。', '封鎖與成功狀態以 badge 顯示。', '不輸出 token、webhook 或客戶資料。'],
+  },
+  reports: {
+    title: '本週報告',
+    description: '本週概況以短 metric 顯示，不輸出長篇 raw status paragraph。',
+    bullets: ['部門：8。', '待處理總數：41。', '系統正常運作率：99.8%。'],
+  },
+  settings: {
+    title: '安全設定',
+    description: '安全設定目前保持只讀顯示；所有 live mutation 仍需另外審批。',
+    bullets: ['無麥克風。', '無 router execution。', '無 Discord / Telegram send。'],
+  },
+}
+
 const APPROVAL_FALLBACK = [
   { label: 'Production 發布需要審批', risk: 'High' },
   { label: '外部 API 存取申請', risk: 'High' },
@@ -207,7 +260,7 @@ function activityRows(snap) {
   }))
 }
 
-function MondayPanel({ title, icon: Icon, action, children, className = '' }) {
+function MondayPanel({ title, icon: Icon, action, onAction, children, className = '' }) {
   return (
     <section className={`monday-panel ${className}`}>
       <div className="mb-3 flex items-center justify-between gap-3">
@@ -215,10 +268,38 @@ function MondayPanel({ title, icon: Icon, action, children, className = '' }) {
           {Icon && <Icon className="h-5 w-5 text-cyan-300" />}
           <span>{title}</span>
         </div>
-        {action && <div className="text-[11px] font-semibold text-cyan-300">{action}</div>}
+        {action && (
+          <button
+            type="button"
+            onClick={onAction}
+            className="monday-panel-action"
+          >
+            {action}
+          </button>
+        )}
       </div>
       {children}
     </section>
+  )
+}
+
+function CommandFocusPanel({ activeCommand, notice }) {
+  const detail = COMMAND_DETAILS[activeCommand] || COMMAND_DETAILS.command
+
+  return (
+    <div className="monday-command-focus" aria-live="polite">
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="h-2 w-2 shrink-0 rounded-full bg-cyan-300 shadow-[0_0_14px_rgba(34,211,238,0.95)]" />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-cyan-200">指揮焦點</span>
+            <span className="h-1 w-1 rounded-full bg-slate-500" />
+            <span className="truncate text-xs font-bold text-white">{detail.title}</span>
+          </div>
+          <p className="mt-0.5 truncate text-[11px] leading-4 text-slate-300">{notice || detail.description}</p>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -259,6 +340,7 @@ export default function MondayDashboard() {
   const [statusSnap, setStatusSnap] = useState(null)
   const [error, setError] = useState(null)
   const [activeCommand, setActiveCommand] = useState('command')
+  const [notice, setNotice] = useState('')
 
   const load = useCallback(async () => {
     try {
@@ -291,6 +373,14 @@ export default function MondayDashboard() {
   const pendingApprovalCount = Math.max(snap?.counts?.pendingApprovals || 0, 7)
   const highRiskCount = Math.max(approvals.filter((item) => item.risk === 'High').length, 3)
   const totalPending = 41
+  const selectCommand = useCallback((item, customNotice) => {
+    setActiveCommand(item.id)
+    setNotice(customNotice || `${item.label} 已選取。右側與底部狀態維持 read-only 顯示。`)
+  }, [])
+  const focusCommand = useCallback((id, customNotice) => {
+    const item = NAV_ITEMS.find((entry) => entry.id === id) || NAV_ITEMS[0]
+    selectCommand(item, customNotice)
+  }, [selectCommand])
 
   return (
     <motion.div
@@ -310,7 +400,8 @@ export default function MondayDashboard() {
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => setActiveCommand(item.id)}
+                  onClick={() => selectCommand(item)}
+                  aria-pressed={active}
                   className={`monday-nav-item ${active ? 'monday-nav-item-active' : ''}`}
                 >
                   <Icon className="h-5 w-5" />
@@ -379,6 +470,7 @@ export default function MondayDashboard() {
               狀態 registry 暫時未能載入：{sanitizeClientText(error, 80)}
             </div>
           )}
+          <CommandFocusPanel activeCommand={activeCommand} notice={notice} />
           <DepartmentProgressPanel
             departments={statusSnap?.departments || []}
             workflows={statusSnap?.workflows || []}
@@ -392,7 +484,7 @@ export default function MondayDashboard() {
         </main>
 
         <aside className="monday-command-right">
-          <MondayPanel title="審批摘要" icon={Shield} className="min-h-[305px]">
+          <MondayPanel title="審批摘要" icon={Shield}>
             <div className="grid grid-cols-2 gap-3">
               <MetricTile label="待審批" value={pendingApprovalCount} detail="較昨日 +2" tone="cyan" />
               <MetricTile label="高風險項目" value={highRiskCount} detail="較昨日 +1" tone="red" />
@@ -400,7 +492,11 @@ export default function MondayDashboard() {
 
             <div className="mt-4 flex items-center justify-between text-sm text-slate-300">
               <span>最高風險項目</span>
-              <button type="button" className="text-xs font-semibold text-cyan-300 hover:text-cyan-100">
+              <button
+                type="button"
+                onClick={() => focusCommand('risks', '已切換至風險焦點；高風險審批仍然需要人手確認。')}
+                className="text-xs font-semibold text-cyan-300 hover:text-cyan-100"
+              >
                 查看全部
               </button>
             </div>
@@ -438,7 +534,12 @@ export default function MondayDashboard() {
         </aside>
 
         <section className="monday-command-bottom">
-          <MondayPanel title="活動紀錄" icon={TerminalSquare} action="查看全部">
+          <MondayPanel
+            title="活動紀錄"
+            icon={TerminalSquare}
+            action="查看全部"
+            onAction={() => focusCommand('logs', '已切換至活動紀錄焦點；目前只展示已清理事件摘要。')}
+          >
             <div className="space-y-2">
               {activities.map((row, index) => (
                 <div key={`${row.time}-${index}`} className="grid grid-cols-[64px_150px_minmax(0,1fr)_88px] items-center gap-3 text-[11px]">
@@ -453,7 +554,12 @@ export default function MondayDashboard() {
             </div>
           </MondayPanel>
 
-          <MondayPanel title="本週概況" icon={Activity} action="查看報告">
+          <MondayPanel
+            title="本週概況"
+            icon={Activity}
+            action="查看報告"
+            onAction={() => focusCommand('reports', '已切換至本週報告焦點；所有數字維持 read-only summary。')}
+          >
             <div className="grid h-full grid-cols-5 gap-2">
               <MetricTile label="部門" value="8" detail="全部運作中" tone="cyan" />
               <MetricTile label="待處理總數" value={totalPending} detail="較上週 +6" tone="green" />

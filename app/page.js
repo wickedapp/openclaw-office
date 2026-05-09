@@ -24,7 +24,7 @@ const tabs = [
 ]
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState('office')
+  const [activeTab, setActiveTab] = useState('monday')
   const [headerStats, setHeaderStats] = useState({
     tasks: 0,
     tokens: 0,
