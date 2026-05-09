@@ -32,43 +32,78 @@ import StatusReadoutPanel from './StatusReadoutPanel'
 const REFRESH_MS = 15000
 const COMMAND_CLOCK = {
   time: '09:42:17',
-  date: 'Mon, May 19, 2025',
+  date: '2025年5月19日（一）',
 }
 
 const NAV_ITEMS = [
-  { id: 'command', label: 'Command Center', icon: Home },
-  { id: 'departments', label: 'Departments', icon: Grid3X3 },
-  { id: 'workflows', label: 'Workflows', icon: Workflow },
+  { id: 'command', label: '指揮中心', icon: Home },
+  { id: 'departments', label: '部門', icon: Grid3X3 },
+  { id: 'workflows', label: '工作流', icon: Workflow },
   { id: 'live-gate', label: 'Live Gate', icon: LockKeyhole },
-  { id: 'sources', label: 'Sources', icon: DatabaseZap },
-  { id: 'risks', label: 'Risks', icon: AlertTriangle },
-  { id: 'manual-input', label: 'Manual Input', icon: ClipboardCheck },
-  { id: 'logs', label: 'Logs', icon: ListChecks },
-  { id: 'reports', label: 'Reports', icon: FileText },
-  { id: 'settings', label: 'Settings', icon: Settings },
+  { id: 'sources', label: '資料來源', icon: DatabaseZap },
+  { id: 'risks', label: '風險', icon: AlertTriangle },
+  { id: 'manual-input', label: '人手處理', icon: ClipboardCheck },
+  { id: 'logs', label: '紀錄', icon: ListChecks },
+  { id: 'reports', label: '報告', icon: FileText },
+  { id: 'settings', label: '設定', icon: Settings },
 ]
 
 const APPROVAL_FALLBACK = [
-  { label: 'Production publish requires approval', risk: 'High' },
-  { label: 'External API access request', risk: 'High' },
-  { label: 'Live operation: Data write request', risk: 'Medium' },
+  { label: 'Production 發布需要審批', risk: 'High' },
+  { label: '外部 API 存取申請', risk: 'High' },
+  { label: 'Live 操作：資料寫入申請', risk: 'Medium' },
 ]
 
 const ACTIVITY_FALLBACK = [
-  { time: '09:41:52', department: 'Approval Department', event: 'New approval request received', status: 'Needs Input' },
-  { time: '09:41:21', department: 'Code / Dev Department', event: 'Build verification completed', status: 'Success' },
-  { time: '09:40:47', department: 'Marketing Department', event: 'Campaign brief updated', status: 'Success' },
-  { time: '09:40:12', department: 'Live Gate', event: 'External actions blocked', status: 'Blocked' },
-  { time: '09:39:58', department: 'Manual Input', event: 'New manual input required', status: 'Pending' },
+  { time: '09:41:52', department: '審批部門', event: '收到新審批申請', status: '需要輸入' },
+  { time: '09:41:21', department: 'Code／開發部門', event: 'Build 驗證完成', status: '成功' },
+  { time: '09:40:47', department: '市場推廣部門', event: 'Campaign brief 已更新', status: '成功' },
+  { time: '09:40:12', department: 'Live Gate', event: '外部操作已封鎖', status: '已封鎖' },
+  { time: '09:39:58', department: '人手處理', event: '新增人手處理項目', status: '待處理' },
 ]
 
 const SOURCE_LABELS = [
-  { id: 'gateway', label: 'Gateway', display: 'Online', detail: 'Status API ready', tone: 'green' },
-  { id: 'notion', label: 'Notion', display: 'Setup needed', detail: 'Not pulled', tone: 'amber' },
-  { id: 'discord', label: 'Discord', display: 'Disabled intentionally', detail: 'No send path', tone: 'cyan' },
-  { id: 'sheets', label: 'Sheets', display: 'Read-only', detail: 'Write blocked', tone: 'green' },
-  { id: 'threads', label: 'Threads', display: 'Locked', detail: 'Publish blocked', tone: 'purple' },
+  { id: 'gateway', label: 'Gateway', display: '在線', detail: 'Status API 就緒', tone: 'green' },
+  { id: 'notion', label: 'Notion', display: '需要設定', detail: '尚未拉取', tone: 'amber' },
+  { id: 'discord', label: 'Discord', display: '已刻意停用', detail: '沒有發送路徑', tone: 'cyan' },
+  { id: 'sheets', label: 'Sheets', display: '只讀', detail: '寫入已封鎖', tone: 'green' },
+  { id: 'threads', label: 'Threads', display: '已鎖定', detail: 'Publish 已封鎖', tone: 'purple' },
 ]
+
+function riskLabelZh(risk) {
+  if (risk === 'High') return '高'
+  if (risk === 'Medium') return '中'
+  if (risk === 'Low') return '低'
+  return risk || '未知'
+}
+
+function healthStatusZh(status) {
+  if (status === 'healthy') return '正常'
+  if (status === 'degraded') return '需留意'
+  if (status === 'down') return '離線'
+  if (status === 'unknown') return '未知'
+  return sanitizeClientText(status, 32)
+}
+
+function auditSourceZh(source) {
+  const normalized = String(source || '').toLowerCase()
+  if (normalized === 'dashboard') return '指揮中心'
+  if (normalized === 'action-router') return 'Action Router'
+  if (normalized === 'live-gate') return 'Live Gate'
+  if (normalized === 'manual') return '人手處理'
+  return sanitizeClientText(source || 'Action Router', 34)
+}
+
+function auditEventZh(event) {
+  const normalized = String(event || '').toLowerCase()
+  if (normalized.includes('telegram')) return 'Telegram notification 路由已封鎖'
+  if (normalized.includes('discord')) return 'Discord 操作已評估'
+  if (normalized.includes('sheet')) return 'Sheet 操作已評估'
+  if (normalized.includes('deploy')) return 'Deploy 操作已評估'
+  if (normalized.includes('status')) return '狀態查詢已完成'
+  if (normalized.includes('readout')) return 'Status Readout 已更新'
+  return sanitizeClientText(event || 'Decision-only route 已評估', 60)
+}
 
 function sanitizeClientText(value, max = 96) {
   return String(value || '')
@@ -90,27 +125,27 @@ function statusPills(statusSnap, manualCount) {
   const blockedCount = statusSnap?.blockedActions?.length || 0
   return [
     {
-      label: statusSnap ? 'Gateway Online' : 'Gateway Loading',
+      label: statusSnap ? 'Gateway 在線' : 'Gateway 載入中',
       icon: CircleDot,
       tone: statusSnap ? 'green' : 'cyan',
     },
-    { label: 'Runtime: pm-sandbox', icon: Gauge, tone: 'blue' },
+    { label: 'Runtime：pm-sandbox', icon: Gauge, tone: 'blue' },
     {
-      label: safety.discordSend === false ? 'Discord Disabled' : 'Discord Guarded',
+      label: safety.discordSend === false ? 'Discord 已停用' : 'Discord 受保護',
       icon: Bot,
       tone: 'gray',
     },
     {
-      label: safety.liveMutationGateDefault === 'blocked' ? 'Live Gate Locked' : 'Live Gate Guarded',
+      label: safety.liveMutationGateDefault === 'blocked' ? 'Live Gate 已鎖定' : 'Live Gate 受保護',
       icon: LockKeyhole,
       tone: 'purple',
     },
     {
-      label: blockedCount > 0 ? 'External Actions Blocked' : 'External Actions Guarded',
+      label: blockedCount > 0 ? '外部操作已封鎖' : '外部操作受保護',
       icon: ShieldAlert,
       tone: 'red',
     },
-    { label: `Manual Input: ${manualCount}`, icon: ClipboardCheck, tone: 'amber' },
+    { label: `人手處理：${manualCount}`, icon: ClipboardCheck, tone: 'amber' },
   ]
 }
 
@@ -129,10 +164,10 @@ function pillTone(tone) {
 
 function badgeTone(status) {
   const normalized = String(status || '').toLowerCase()
-  if (normalized.includes('blocked')) return 'border-red-400/30 bg-red-500/10 text-red-200'
-  if (normalized.includes('needs')) return 'border-amber-300/30 bg-amber-500/10 text-amber-200'
-  if (normalized.includes('pending')) return 'border-amber-300/30 bg-amber-500/10 text-amber-200'
-  if (normalized.includes('success')) return 'border-emerald-300/30 bg-emerald-500/10 text-emerald-200'
+  if (normalized.includes('blocked') || normalized.includes('已封鎖')) return 'border-red-400/30 bg-red-500/10 text-red-200'
+  if (normalized.includes('needs') || normalized.includes('需要')) return 'border-amber-300/30 bg-amber-500/10 text-amber-200'
+  if (normalized.includes('pending') || normalized.includes('待處理')) return 'border-amber-300/30 bg-amber-500/10 text-amber-200'
+  if (normalized.includes('success') || normalized.includes('成功')) return 'border-emerald-300/30 bg-emerald-500/10 text-emerald-200'
   return 'border-cyan-300/30 bg-cyan-500/10 text-cyan-200'
 }
 
@@ -140,13 +175,13 @@ function sourceRows(health = {}) {
   return SOURCE_LABELS.map((source) => {
     const current = health[source.id]
     if (!current || source.id === 'gateway') return source
-    if (source.id === 'notion') return { ...source, display: 'Setup needed', detail: 'Not pulled' }
-    if (source.id === 'discord') return { ...source, display: 'Disabled intentionally', detail: 'No bot/listener' }
-    if (source.id === 'sheets') return { ...source, display: 'Read-only', detail: 'Write blocked' }
-    if (source.id === 'threads') return { ...source, display: 'Locked', detail: 'Publish blocked' }
+    if (source.id === 'notion') return { ...source, display: '需要設定', detail: '尚未拉取' }
+    if (source.id === 'discord') return { ...source, display: '已刻意停用', detail: '無 bot/listener' }
+    if (source.id === 'sheets') return { ...source, display: '只讀', detail: '寫入已封鎖' }
+    if (source.id === 'threads') return { ...source, display: '已鎖定', detail: 'Publish 已封鎖' }
     return {
       ...source,
-      display: current.status === 'unknown' ? source.display : sanitizeClientText(current.status, 32),
+      display: current.status === 'unknown' ? source.display : healthStatusZh(current.status),
       detail: sanitizeClientText(current.note || source.detail, 64),
     }
   })
@@ -156,7 +191,7 @@ function approvalItems(snap) {
   const pending = Array.isArray(snap?.pendingApprovals) ? snap.pendingApprovals : []
   if (pending.length === 0) return APPROVAL_FALLBACK
   return pending.slice(0, 3).map((item, index) => ({
-    label: sanitizeClientText(item.action?.description || item.action?.kind || item.id || `Approval request ${index + 1}`),
+    label: sanitizeClientText(item.action?.description || item.action?.kind || item.id || `審批申請 ${index + 1}`),
     risk: index < 2 ? 'High' : 'Medium',
   }))
 }
@@ -166,9 +201,9 @@ function activityRows(snap) {
   if (audit.length === 0) return ACTIVITY_FALLBACK
   return audit.slice(-5).reverse().map((entry) => ({
     time: sanitizeClientText(entry.timestamp || '09:41:52', 8),
-    department: sanitizeClientText(entry.source || 'Action Router', 34),
-    event: sanitizeClientText(entry.task_type || entry.summary || 'Decision-only route evaluated', 60),
-    status: entry.execution_result === 'blocked' ? 'Blocked' : 'Success',
+    department: auditSourceZh(entry.source),
+    event: auditEventZh(entry.task_type || entry.summary),
+    status: entry.execution_result === 'blocked' ? '已封鎖' : '成功',
   }))
 }
 
@@ -176,7 +211,7 @@ function MondayPanel({ title, icon: Icon, action, children, className = '' }) {
   return (
     <section className={`monday-panel ${className}`}>
       <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-[13px] font-bold uppercase tracking-[0.04em] text-slate-100">
+        <div className="flex items-center gap-2 text-[13px] font-bold tracking-[0.04em] text-slate-100">
           {Icon && <Icon className="h-5 w-5 text-cyan-300" />}
           <span>{title}</span>
         </div>
@@ -209,9 +244,9 @@ function SafetyItem({ icon: Icon, label, enabled }) {
     <div className="flex min-h-10 items-center gap-3 rounded-md border border-cyan-300/10 bg-cyan-950/10 px-3 py-1.5">
       <Icon className="h-5 w-5 text-slate-300" />
       <div className="min-w-0 flex-1">
-        <div className="truncate text-[11px] text-slate-200">{label}</div>
+        <div className="text-[10px] leading-tight text-slate-200">{label}</div>
         <div className={`text-[10px] font-bold uppercase ${enabled ? 'text-emerald-300' : 'text-red-300'}`}>
-          {enabled ? 'Enabled' : 'Attention'}
+          {enabled ? '已啟用' : '需留意'}
         </div>
       </div>
       <span className={`h-2 w-2 rounded-full ${enabled ? 'bg-emerald-400' : 'bg-red-400'}`} />
@@ -292,14 +327,14 @@ export default function MondayDashboard() {
 
           <div className="mt-auto space-y-3 px-3 pb-4">
             <div className="rounded-md border border-cyan-300/10 bg-cyan-950/10 p-3">
-              <div className="text-[11px] text-slate-300">System Status</div>
+              <div className="text-[11px] text-slate-300">系統狀態</div>
               <div className="mt-1 flex items-center gap-2 text-xs font-bold text-emerald-300">
                 <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.9)]" />
-                Operational
+                正常
               </div>
             </div>
             <div className="rounded-md border border-cyan-300/10 bg-cyan-950/10 p-3">
-              <div className="text-[11px] text-slate-300">Environment</div>
+              <div className="text-[11px] text-slate-300">環境</div>
               <div className="mt-1 flex items-center justify-between text-sm text-sky-200">
                 <span>pm-sandbox</span>
                 <SlidersHorizontal className="h-4 w-4 text-slate-500" />
@@ -314,8 +349,8 @@ export default function MondayDashboard() {
               <span />
             </div>
             <div>
-              <h2 className="text-xl font-bold tracking-[-0.01em] text-white">Monday Command Office</h2>
-              <p className="mt-0.5 text-xs text-slate-400">AI Operations Command Center</p>
+              <h2 className="text-xl font-bold tracking-[-0.01em] text-white">Monday 指揮辦公室</h2>
+              <p className="mt-0.5 text-xs text-slate-400">AI 營運指揮中心</p>
             </div>
           </div>
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
@@ -341,7 +376,7 @@ export default function MondayDashboard() {
         <main className="monday-command-center">
           {error && (
             <div className="absolute left-5 top-4 z-20 rounded-md border border-red-400/30 bg-red-950/80 px-3 py-2 text-xs text-red-100">
-              Status registry unavailable: {sanitizeClientText(error, 80)}
+              狀態 registry 暫時未能載入：{sanitizeClientText(error, 80)}
             </div>
           )}
           <DepartmentProgressPanel
@@ -357,16 +392,16 @@ export default function MondayDashboard() {
         </main>
 
         <aside className="monday-command-right">
-          <MondayPanel title="Approval Summary" icon={Shield} className="min-h-[305px]">
+          <MondayPanel title="審批摘要" icon={Shield} className="min-h-[305px]">
             <div className="grid grid-cols-2 gap-3">
-              <MetricTile label="Pending Approvals" value={pendingApprovalCount} detail="2 from yesterday" tone="cyan" />
-              <MetricTile label="High-Risk Items" value={highRiskCount} detail="1 from yesterday" tone="red" />
+              <MetricTile label="待審批" value={pendingApprovalCount} detail="較昨日 +2" tone="cyan" />
+              <MetricTile label="高風險項目" value={highRiskCount} detail="較昨日 +1" tone="red" />
             </div>
 
             <div className="mt-4 flex items-center justify-between text-sm text-slate-300">
-              <span>Top High-Risk Items</span>
+              <span>最高風險項目</span>
               <button type="button" className="text-xs font-semibold text-cyan-300 hover:text-cyan-100">
-                View All
+                查看全部
               </button>
             </div>
             <div className="mt-2 space-y-2">
@@ -375,7 +410,7 @@ export default function MondayDashboard() {
                   <span className="w-4 text-slate-400">{index + 1}</span>
                   <span className="min-w-0 flex-1 truncate text-slate-200">{item.label}</span>
                   <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${item.risk === 'High' ? 'bg-red-500/15 text-red-200' : 'bg-amber-500/15 text-amber-200'}`}>
-                    {item.risk}
+                    {riskLabelZh(item.risk)}
                   </span>
                 </div>
               ))}
@@ -403,7 +438,7 @@ export default function MondayDashboard() {
         </aside>
 
         <section className="monday-command-bottom">
-          <MondayPanel title="Activity Log" icon={TerminalSquare} action="View All">
+          <MondayPanel title="活動紀錄" icon={TerminalSquare} action="查看全部">
             <div className="space-y-2">
               {activities.map((row, index) => (
                 <div key={`${row.time}-${index}`} className="grid grid-cols-[64px_150px_minmax(0,1fr)_88px] items-center gap-3 text-[11px]">
@@ -418,24 +453,24 @@ export default function MondayDashboard() {
             </div>
           </MondayPanel>
 
-          <MondayPanel title="Weekly Snapshot" icon={Activity} action="View Report">
+          <MondayPanel title="本週概況" icon={Activity} action="查看報告">
             <div className="grid h-full grid-cols-5 gap-2">
-              <MetricTile label="Departments" value="8" detail="All operational" tone="cyan" />
-              <MetricTile label="Total Pending" value={totalPending} detail="6 from last week" tone="green" />
-              <MetricTile label="High-Risk Items" value={highRiskCount} detail="2 from last week" tone="red" />
-              <MetricTile label="Manual Input" value={manualCount} detail="Same as last week" tone="amber" />
-              <MetricTile label="System Uptime" value="99.8%" detail="Excellent" tone="cyan" />
+              <MetricTile label="部門" value="8" detail="全部運作中" tone="cyan" />
+              <MetricTile label="待處理總數" value={totalPending} detail="較上週 +6" tone="green" />
+              <MetricTile label="高風險項目" value={highRiskCount} detail="較上週 +2" tone="red" />
+              <MetricTile label="人手處理" value={manualCount} detail="與上週相同" tone="amber" />
+              <MetricTile label="系統正常運作率" value="99.8%" detail="良好" tone="cyan" />
             </div>
           </MondayPanel>
 
-          <MondayPanel title="System Safety Status" icon={Shield} className="monday-safety-panel">
+          <MondayPanel title="系統安全狀態" icon={Shield} className="monday-safety-panel">
             <div className="grid grid-cols-2 gap-2">
-              <SafetyItem icon={Shield} label="Read-only Status" enabled={safety.readOnly !== false} />
-              <SafetyItem icon={MicOff} label="No Microphone" enabled={safety.microphonePermission === false} />
-              <SafetyItem icon={RadioTower} label="No Router Execution" enabled={safety.actionRouterMutation === false} />
-              <SafetyItem icon={Bot} label="No Discord Send" enabled={safety.discordSend === false} />
-              <SafetyItem icon={Layers3} label="No Deploy / Publish" enabled={safety.publishDeployScheduler === false} />
-              <SafetyItem icon={BookOpen} label="No Scheduler / Sheet Write" enabled={safety.googleSheetWrite === false} />
+              <SafetyItem icon={Shield} label="只讀狀態" enabled={safety.readOnly !== false} />
+              <SafetyItem icon={MicOff} label="無麥克風" enabled={safety.microphonePermission === false} />
+              <SafetyItem icon={RadioTower} label="無 Router 執行" enabled={safety.actionRouterMutation === false} />
+              <SafetyItem icon={Bot} label="無 Discord 發送" enabled={safety.discordSend === false} />
+              <SafetyItem icon={Layers3} label="無 Deploy / Publish" enabled={safety.publishDeployScheduler === false} />
+              <SafetyItem icon={BookOpen} label="無 Scheduler / Sheet 寫入" enabled={safety.googleSheetWrite === false} />
             </div>
           </MondayPanel>
         </section>

@@ -16,7 +16,7 @@ import {
 const POD_CONFIG = [
   {
     id: 'pm',
-    name: 'PM Department',
+    name: 'PM 部門',
     icon: UsersRound,
     departments: ['pm-monday'],
     workflows: ['openclaw-runtime', 'monday-config'],
@@ -24,11 +24,11 @@ const POD_CONFIG = [
     risk: 'Low',
     progress: 78,
     className: 'pod-pos-pm',
-    checkpoint: 'pm-sandbox remains the canonical runtime.',
+    checkpoint: 'pm-sandbox 保持為 canonical runtime。',
   },
   {
     id: 'approval',
-    name: 'Approval Department',
+    name: '審批部門',
     icon: ShieldCheck,
     departments: ['approval'],
     workflows: ['live-mutation-gate'],
@@ -36,11 +36,11 @@ const POD_CONFIG = [
     risk: 'High',
     progress: 42,
     className: 'pod-pos-approval',
-    checkpoint: 'Approval gate required for send, publish, deploy, and write actions.',
+    checkpoint: '發送、Publish、Deploy、寫入操作仍需要審批 gate。',
   },
   {
     id: 'marketing',
-    name: 'Marketing Department',
+    name: '市場推廣部門',
     icon: Megaphone,
     departments: ['marketing', 'xarisauto'],
     workflows: ['xarisauto-google-sheet', 'meta-app-review'],
@@ -48,11 +48,11 @@ const POD_CONFIG = [
     risk: 'Low',
     progress: 65,
     className: 'pod-pos-marketing',
-    checkpoint: 'Threads and Google Sheets stay dry-run or approval-gated.',
+    checkpoint: 'Threads 與 Google Sheets 保持 dry-run 或審批 gate。',
   },
   {
     id: 'creative',
-    name: 'Creative / Materials Department',
+    name: '創意／教材部門',
     icon: Palette,
     departments: ['creative', 'story-class'],
     workflows: ['story-class-picture-books'],
@@ -60,11 +60,11 @@ const POD_CONFIG = [
     risk: 'Medium',
     progress: 60,
     className: 'pod-pos-creative',
-    checkpoint: 'Production materials remain read-only until approved.',
+    checkpoint: 'Production 教材在批准前保持只讀。',
   },
   {
     id: 'code',
-    name: 'Code / Dev Department',
+    name: 'Code／開發部門',
     icon: Code2,
     departments: ['code'],
     workflows: ['action-router', 'openclaw-office-ui'],
@@ -72,11 +72,11 @@ const POD_CONFIG = [
     risk: 'Medium',
     progress: 72,
     className: 'pod-pos-code',
-    checkpoint: 'Local tests and build verification before scoped commits.',
+    checkpoint: 'Scoped commit 前先完成本地 tests 與 build 驗證。',
   },
   {
     id: 'sales',
-    name: 'Sales Support Department',
+    name: 'Sales 支援部門',
     icon: Handshake,
     departments: ['smartstart'],
     workflows: ['smartstart'],
@@ -84,11 +84,11 @@ const POD_CONFIG = [
     risk: 'Low',
     progress: 68,
     className: 'pod-pos-sales',
-    checkpoint: 'Customer-facing sends stay manual and approval-gated.',
+    checkpoint: '對外發送保持人手處理及審批 gate。',
   },
   {
     id: 'teaching',
-    name: 'Teaching / Curriculum Department',
+    name: '教學／課程部門',
     icon: BookOpen,
     departments: ['story-class', 'smartstart'],
     workflows: ['story-class-picture-books'],
@@ -96,11 +96,11 @@ const POD_CONFIG = [
     risk: 'Low',
     progress: 55,
     className: 'pod-pos-teaching',
-    checkpoint: 'Curriculum workflow is visible without production overwrite.',
+    checkpoint: '課程 workflow 可見，但不覆寫 production output。',
   },
   {
     id: 'ops',
-    name: 'Ops / System Department',
+    name: 'Ops／系統部門',
     icon: Settings2,
     departments: ['openclaw-core', 'discord-control', 'network-runner'],
     workflows: ['discord-control', 'filesystem-mcp'],
@@ -108,9 +108,24 @@ const POD_CONFIG = [
     risk: 'Medium',
     progress: 70,
     className: 'pod-pos-ops',
-    checkpoint: 'Discord disabled; external operations are locked.',
+    checkpoint: 'Discord 已停用；外部操作保持鎖定。',
   },
 ]
+
+function statusLabelZh(status) {
+  if (status === 'Active') return '運作中'
+  if (status === 'Needs Input') return '需要輸入'
+  if (status === 'Read-only') return '只讀'
+  if (status === 'Blocked') return '已封鎖'
+  return status || '未知'
+}
+
+function riskLabelZh(risk) {
+  if (risk === 'High') return '高'
+  if (risk === 'Medium') return '中'
+  if (risk === 'Low') return '低'
+  return risk || '未知'
+}
 
 function byId(items = []) {
   return items.reduce((acc, item) => {
@@ -144,7 +159,7 @@ function resolvePodStatus(config, departmentsById, workflowsById) {
 function resolveCheckpoint(config, departmentsById, workflowsById) {
   const department = config.departments.map((id) => departmentsById[id]).find(Boolean)
   const workflow = config.workflows.map((id) => workflowsById[id]).find(Boolean)
-  return sanitizeText(department?.latestCheckpoint || workflow?.notes || config.checkpoint)
+  return sanitizeText(config.checkpoint || department?.latestCheckpoint || workflow?.notes)
 }
 
 function statusTone(status) {
@@ -186,22 +201,22 @@ function DepartmentPod({ pod }) {
         </div>
         <div className="min-w-0 flex-1">
           <h3 className="text-[15px] font-bold leading-snug text-white">{pod.name}</h3>
-          <p className="mt-1 truncate text-[10px] text-slate-500">{pod.workflowCount} workflow links</p>
+          <p className="mt-1 truncate text-[10px] text-slate-500">{pod.workflowCount} 個工作流</p>
         </div>
       </div>
 
       <div className="mt-3 grid grid-cols-[1fr_56px_56px] items-center gap-2">
         <span className={`inline-flex w-fit items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-semibold ${statusTone(pod.status)}`}>
           <span className="h-1.5 w-1.5 rounded-full bg-current" />
-          {pod.status}
+          {statusLabelZh(pod.status)}
         </span>
         <div className="text-center">
-          <div className="text-[10px] text-slate-500">Pending</div>
+          <div className="text-[10px] text-slate-500">待處理</div>
           <div className="text-lg font-bold text-slate-100">{pod.pending}</div>
         </div>
         <div className="text-center">
-          <div className="text-[10px] text-slate-500">Risk</div>
-          <div className={`text-xs font-bold ${riskTone(pod.risk)}`}>{pod.risk}</div>
+          <div className="text-[10px] text-slate-500">風險</div>
+          <div className={`text-xs font-bold ${riskTone(pod.risk)}`}>{riskLabelZh(pod.risk)}</div>
         </div>
       </div>
 
@@ -263,24 +278,24 @@ export default function DepartmentProgressPanel({ departments = [], workflows = 
               <br />
               CORE
             </div>
-            <div className="mt-2 text-[11px] font-semibold text-sky-100/80">Central Intelligence System</div>
+            <div className="mt-2 text-[11px] font-semibold text-sky-100/80">中央智能系統</div>
           </div>
         </div>
         <div className="core-platform" />
         <div className="core-stat core-stat-pending">
-          <span>Pending</span>
+          <span>待處理</span>
           <strong>{counts.totalPending || 41}</strong>
         </div>
         <div className="core-stat core-stat-approval">
-          <span>Approval</span>
+          <span>審批</span>
           <strong>{counts.pendingApprovals || 7}</strong>
         </div>
         <div className="core-stat core-stat-risk">
-          <span>Risk</span>
+          <span>風險</span>
           <strong>{counts.highRisk || 3}</strong>
         </div>
         <div className="core-stat core-stat-progress">
-          <span>Progress</span>
+          <span>進度</span>
           <strong>69%</strong>
         </div>
       </div>
@@ -291,7 +306,7 @@ export default function DepartmentProgressPanel({ departments = [], workflows = 
 
       <div className="topology-footer-note">
         <CheckCircle2 className="h-4 w-4 text-emerald-300" />
-        <span>Registry-driven status, decision-only routing, live mutations blocked by default.</span>
+        <span>Registry 狀態驅動；decision-only routing；live mutation 預設封鎖。</span>
       </div>
     </section>
   )
