@@ -178,7 +178,7 @@ export default function StatusReadoutPanel({ snapshot }) {
 
       <div className="monday-control-feedback" aria-live="polite">{panelNotice}</div>
 
-      <div className="max-h-[156px] overflow-hidden rounded-md border border-cyan-300/10 bg-slate-950/55 p-3 shadow-[inset_0_0_30px_rgba(8,47,73,0.38)]">
+      <div className="monday-readout-box max-h-[156px] overflow-hidden rounded-md border border-cyan-300/10 bg-slate-950/55 p-3 shadow-[inset_0_0_30px_rgba(8,47,73,0.38)]">
         <p className="text-xs leading-5 text-slate-200">{readout.transcript}</p>
         <ul className="mt-2 space-y-1 text-[11px] leading-4 text-slate-400">
           {readout.bullets.map((line) => (

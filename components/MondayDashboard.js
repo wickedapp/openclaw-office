@@ -512,7 +512,7 @@ export default function MondayDashboard() {
               ))}
             </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-2">
+            <div className="monday-source-grid mt-4 grid grid-cols-2 gap-2">
               {sources.map((source) => (
                 <div key={source.id} className="rounded-md border border-cyan-300/10 bg-cyan-950/10 px-3 py-2">
                   <div className="flex items-center gap-2 text-[11px] text-slate-300">
@@ -540,7 +540,7 @@ export default function MondayDashboard() {
             action="查看全部"
             onAction={() => focusCommand('logs', '已切換至活動紀錄焦點；目前只展示已清理事件摘要。')}
           >
-            <div className="space-y-2">
+            <div className="monday-activity-list space-y-2">
               {activities.map((row, index) => (
                 <div key={`${row.time}-${index}`} className="grid grid-cols-[64px_150px_minmax(0,1fr)_88px] items-center gap-3 text-[11px]">
                   <span className="font-mono text-slate-400">{row.time}</span>
@@ -560,7 +560,7 @@ export default function MondayDashboard() {
             action="查看報告"
             onAction={() => focusCommand('reports', '已切換至本週報告焦點；所有數字維持 read-only summary。')}
           >
-            <div className="grid h-full grid-cols-5 gap-2">
+            <div className="monday-weekly-grid grid h-full grid-cols-5 gap-2">
               <MetricTile label="部門" value="8" detail="全部運作中" tone="cyan" />
               <MetricTile label="待處理總數" value={totalPending} detail="較上週 +6" tone="green" />
               <MetricTile label="高風險項目" value={highRiskCount} detail="較上週 +2" tone="red" />
@@ -570,7 +570,7 @@ export default function MondayDashboard() {
           </MondayPanel>
 
           <MondayPanel title="系統安全狀態" icon={Shield} className="monday-safety-panel">
-            <div className="grid grid-cols-2 gap-2">
+            <div className="monday-safety-grid grid grid-cols-2 gap-2">
               <SafetyItem icon={Shield} label="只讀狀態" enabled={safety.readOnly !== false} />
               <SafetyItem icon={MicOff} label="無麥克風" enabled={safety.microphonePermission === false} />
               <SafetyItem icon={RadioTower} label="無 Router 執行" enabled={safety.actionRouterMutation === false} />
