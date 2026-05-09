@@ -49,7 +49,7 @@ t('blocked tasks still write audit log', () => {
   const logs = getAuditLog()
   assert.equal(r.blocked, true)
   assert.equal(logs.length, 1)
-  assert.equal(logs[0].blocked_reason, 'scheduler_task_blocked_without_explicit_policy')
+  assert.equal(logs[0].blocked_reason, 'live_mutation_gate_missing_required_approval_fields')
 })
 
 console.log(`\n${pass} passed, ${fail} failed`)

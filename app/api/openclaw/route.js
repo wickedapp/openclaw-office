@@ -10,6 +10,7 @@ import { AGENTS, STATE_CONFIG } from '../../../lib/workflow.js'
 import { sendTelegramNotification, formatDelegationNotification } from '../../../lib/telegram.js'
 import { getStatus, setCurrentRequest, getCurrentRequest } from '../../../lib/openclaw-ws.js'
 import { routeAction } from '../../../lib/action-router/engine.js'
+import { TASK_TYPES } from '../../../lib/action-router/classifier.js'
 
 function timeStr() {
   return new Date().toLocaleTimeString('en-US', { 
@@ -67,11 +68,13 @@ export async function POST(request) {
       const routeDecision = routeAction({
         source: 'dashboard',
         action: 'assign',
-        text: content || reason || agent,
+        taskType: notify ? TASK_TYPES.TELEGRAM_NOTIFICATION : undefined,
+        text: notify ? `send Telegram notification for ${(content || reason || agent || 'assignment')}` : (content || reason || agent),
         requestedAgent: agent,
       }, {
         source: 'dashboard',
         approval: body.approval || null,
+        liveMutationApproval: body.liveMutationApproval || body.live_mutation_approval || null,
         preflight: body.preflight || null,
         executionMode: 'decision_only',
       })

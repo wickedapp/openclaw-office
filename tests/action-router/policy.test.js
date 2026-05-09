@@ -140,6 +140,33 @@ t('Discord send is blocked by default', () => {
   assert.equal(r.blockedReason, 'live_mutation_gate_missing_required_approval_fields')
 })
 
+t('Telegram notification is blocked by live mutation gate by default', () => {
+  const r = routeAction({ source: 'dashboard', text: 'send Telegram notification to operator' })
+  assert.equal(r.selectedAgent, ROUTER_AGENTS.NETWORK_RUNNER)
+  assert.equal(r.executionStatus, EXECUTION_STATUSES.BLOCKED)
+  assert.equal(r.mutationPermission, true)
+  assert.equal(r.liveMutationGate.action, 'telegram_notification')
+  assert.equal(r.blockedReason, 'live_mutation_gate_missing_required_approval_fields')
+})
+
+t('Telegram notification approval package must match exact action', () => {
+  const r = routeAction(
+    { source: 'dashboard', text: 'send Telegram notification to operator' },
+    {
+      liveMutationApproval: {
+        explicit_approval_phrase: REQUIRED_APPROVAL_PHRASE,
+        exact_target: 'operator chat',
+        exact_action: 'webhook_send',
+        rollback_owner: 'owner',
+        environment_confirmation: 'local dry-run only',
+        dry_run_validation_result: 'pass',
+      },
+    },
+  )
+  assert.equal(r.executionStatus, EXECUTION_STATUSES.BLOCKED)
+  assert.equal(r.blockedReason, 'live_mutation_gate_action_mismatch')
+})
+
 t('production deploy is blocked by default', () => {
   const r = routeAction({ source: 'dashboard', text: 'deploy production release' })
   assert.equal(r.selectedAgent, ROUTER_AGENTS.MANUAL_REVIEW)

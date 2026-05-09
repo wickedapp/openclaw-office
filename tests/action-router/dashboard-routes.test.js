@@ -1,10 +1,11 @@
 // Run with: node tests/action-router/dashboard-routes.test.js
 import assert from 'node:assert/strict'
 import { GET as dashboardGET, POST as dashboardPOST } from '../../app/api/monday/dashboard/route.js'
+import * as statusRoute from '../../app/api/monday/status/route.js'
 import { POST as dispatchPOST } from '../../app/api/monday/dispatch/route.js'
 import { POST as routerPOST } from '../../app/api/action-router/route.js'
 import { resetAuditLog } from '../../lib/action-router/audit.js'
-import { resetState } from '../../lib/monday/store.js'
+import { dashboardSnapshot, resetState, setSourceHealth } from '../../lib/monday/store.js'
 
 let pass = 0
 let fail = 0
@@ -108,6 +109,56 @@ ta('Dashboard GET includes Action Router audit visibility', async () => {
   assert.equal(data.actionRouter.mode, 'action-router-v1-decision-only')
   assert.ok(Array.isArray(data.actionRouter.auditLog))
   assert.ok(data.actionRouter.auditLog.length >= 1)
+})
+
+ta('Dashboard source health write is unsupported and cannot reflect arbitrary patch', async () => {
+  resetState()
+  const response = await dashboardPOST(req({
+    action: 'set_source_health',
+    source: 'evil',
+    patch: {
+      status: 'healthy',
+      note: '<script>token=sk-' + 'a'.repeat(24) + '</script>',
+      arbitrary: { nested: true },
+    },
+  }))
+  const data = await response.json()
+  assert.equal(response.status, 403)
+  assert.equal(data.error, 'unsupported_action')
+
+  const dashboard = await dashboardGET()
+  const snap = await dashboard.json()
+  assert.equal(snap.sourceHealth.evil, undefined)
+  assert(!JSON.stringify(snap.sourceHealth).includes('sk-'))
+  assert(!JSON.stringify(snap.sourceHealth).includes('<script>'))
+})
+
+ta('Source health store rejects arbitrary source and strips unsafe fields', () => {
+  resetState()
+  const rejected = setSourceHealth('evil', { status: 'healthy', note: 'ok' })
+  assert.equal(rejected.error, 'unsupported_source')
+  assert.equal(dashboardSnapshot().sourceHealth.evil, undefined)
+
+  const updated = setSourceHealth('discord', {
+    status: 'healthy',
+    note: '<script>api_key=sk-' + 'b'.repeat(24) + '</script>',
+    arbitrary: { nested: true },
+  })
+  assert.equal(updated.status, 'healthy')
+  assert.equal(updated.arbitrary, undefined)
+  assert(!updated.note.includes('sk-'))
+  assert(!updated.note.includes('<script>'))
+  assert(updated.note.includes('[REDACTED]') || updated.note.includes('[REDACTED_SECRET]'))
+})
+
+ta('Monday status API remains GET-only and sanitized', async () => {
+  assert.equal(statusRoute.POST, undefined)
+  const response = await statusRoute.GET(new Request('http://localhost/api/monday/status'))
+  const data = await response.json()
+  assert.equal(data.safety.readOnly, true)
+  assert.equal(data.safety.actionRouterMutation, false)
+  assert.equal(data.safety.googleSheetWrite, false)
+  assert(!JSON.stringify(data).includes('sk-'))
 })
 
 for (const run of tests) await run()

@@ -3,8 +3,8 @@
 // Request = incoming message record (immutable after creation)
 // Task = work unit with independent lifecycle (pending → assigned → in_progress → completed/failed)
 
-import { analyzeTask, AGENTS, STATE_CONFIG } from '../../../lib/workflow'
-import { sendTelegramNotification, formatDelegationNotification } from '../../../lib/telegram'
+import { analyzeTask, AGENTS, STATE_CONFIG } from '../../../lib/workflow.js'
+import { sendTelegramNotification, formatDelegationNotification } from '../../../lib/telegram.js'
 import { 
   createRequest, 
   updateRequest, 
@@ -30,9 +30,10 @@ import {
   getActiveTasks,
   getRecentTasks,
   completeAllActiveTasks,
-} from '../../../lib/db'
-import { eventBus, EVENTS } from '../../../lib/event-bus'
+} from '../../../lib/db.js'
+import { eventBus, EVENTS } from '../../../lib/event-bus.js'
 import { routeAction } from '../../../lib/action-router/engine.js'
+import { TASK_TYPES } from '../../../lib/action-router/classifier.js'
 
 function timeStr() {
   return new Date().toLocaleTimeString('en-US', { 
@@ -106,9 +107,13 @@ function cleanContent(content) {
 }
 
 function dashboardRouteDecision(input, context = {}) {
-  return routeAction({ ...input, source: 'dashboard' }, {
+  const routedInput = context.notify
+    ? { ...input, taskType: TASK_TYPES.TELEGRAM_NOTIFICATION, source: 'dashboard' }
+    : { ...input, source: 'dashboard' }
+  return routeAction(routedInput, {
     source: 'dashboard',
     approval: context.approval || null,
+    liveMutationApproval: context.liveMutationApproval || context.live_mutation_approval || null,
     preflight: context.preflight || null,
     executionMode: 'decision_only',
   })
@@ -487,7 +492,8 @@ export async function POST(request) {
 
       const routeDecision = dashboardRouteDecision({
         action: 'quick_flow',
-        text: content,
+        taskType: notify ? TASK_TYPES.TELEGRAM_NOTIFICATION : undefined,
+        text: notify ? `send Telegram notification for ${content}` : content,
         requestedAgent: agent,
       }, body)
       if (shouldStopForRouter(routeDecision)) return routeOnlyResponse(routeDecision)

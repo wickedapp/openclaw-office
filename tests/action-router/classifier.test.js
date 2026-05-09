@@ -61,6 +61,10 @@ t('classifies dangerous Discord send separately', () => {
   assert.equal(classifyTask({ text: 'send a Discord message to approvals' }).taskType, TASK_TYPES.DISCORD_SEND)
 })
 
+t('classifies Telegram notification as live mutation', () => {
+  assert.equal(classifyTask({ text: 'send Telegram notification to the operator' }).taskType, TASK_TYPES.TELEGRAM_NOTIFICATION)
+})
+
 t('classifies production deploy as blocked category', () => {
   assert.equal(classifyTask({ text: 'deploy production dashboard' }).taskType, TASK_TYPES.PRODUCTION_DEPLOY)
 })
