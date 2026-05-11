@@ -30,9 +30,14 @@ import DepartmentProgressPanel from './DepartmentProgressPanel'
 import StatusReadoutPanel from './StatusReadoutPanel'
 
 const REFRESH_MS = 15000
-const COMMAND_CLOCK = {
-  time: '09:42:17',
-  date: '2025年5月19日（一）',
+
+function getCommandClock(generatedAt) {
+  const date = generatedAt ? new Date(generatedAt) : new Date()
+  const weekday = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()]
+  return {
+    time: date.toLocaleTimeString('zh-HK', { hour12: false }),
+    date: `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日（${weekday}）`,
+  }
 }
 
 const NAV_ITEMS = [
@@ -92,7 +97,7 @@ const COMMAND_DETAILS = {
   reports: {
     title: '本週報告',
     description: '本週概況以短 metric 顯示，不輸出長篇 raw status paragraph。',
-    bullets: ['部門：8。', '待處理總數：41。', '系統正常運作率：99.8%。'],
+    bullets: ['部門數量由 status registry 載入。', '待處理總數由審批、人手處理與封鎖狀態合併計算。', '不顯示 raw secret 或 webhook。'],
   },
   settings: {
     title: '安全設定',
@@ -228,14 +233,11 @@ function sourceRows(health = {}) {
   return SOURCE_LABELS.map((source) => {
     const current = health[source.id]
     if (!current || source.id === 'gateway') return source
-    if (source.id === 'notion') return { ...source, display: '需要設定', detail: '尚未拉取' }
-    if (source.id === 'discord') return { ...source, display: '已刻意停用', detail: '無 bot/listener' }
-    if (source.id === 'sheets') return { ...source, display: '只讀', detail: '寫入已封鎖' }
-    if (source.id === 'threads') return { ...source, display: '已鎖定', detail: 'Publish 已封鎖' }
+    const safeDetail = current.note || (source.id === 'discord' ? 'decision-only；無 bot/listener' : source.detail)
     return {
       ...source,
       display: current.status === 'unknown' ? source.display : healthStatusZh(current.status),
-      detail: sanitizeClientText(current.note || source.detail, 64),
+      detail: sanitizeClientText(safeDetail, 64),
     }
   })
 }
@@ -343,19 +345,23 @@ export default function MondayDashboard() {
   const [notice, setNotice] = useState('')
 
   const load = useCallback(async () => {
-    try {
-      const dashboardResponse = await fetch('/api/monday/dashboard')
-      if (!dashboardResponse.ok) throw new Error(`dashboard HTTP ${dashboardResponse.status}`)
-      const dashboardJson = await dashboardResponse.json()
-      const statusResponse = await fetch('/api/monday/status')
-      if (!statusResponse.ok) throw new Error(`status HTTP ${statusResponse.status}`)
-      const statusJson = await statusResponse.json()
-      setSnap(dashboardJson)
-      setStatusSnap(statusJson)
-      setError(null)
-    } catch (e) {
-      setError(e.message)
+    async function fetchJson(path) {
+      const dashboardResponse = await fetch(path)
+      if (!dashboardResponse.ok) throw new Error(`${path} HTTP ${dashboardResponse.status}`)
+      return dashboardResponse.json()
     }
+
+    const [dashboard, status] = await Promise.allSettled([
+      fetchJson('/api/monday/dashboard'),
+      fetchJson('/api/monday/status'),
+    ])
+    if (dashboard.status === 'fulfilled') setSnap(dashboard.value)
+    if (status.status === 'fulfilled') setStatusSnap(status.value)
+    const failures = [
+      dashboard.status === 'rejected' ? `dashboard: ${dashboard.reason?.message || 'load failed'}` : '',
+      status.status === 'rejected' ? `status: ${status.reason?.message || 'load failed'}` : '',
+    ].filter(Boolean)
+    setError(failures.length ? failures.join('; ') : null)
   }, [])
 
   useEffect(() => {
@@ -372,7 +378,11 @@ export default function MondayDashboard() {
   const safety = statusSnap?.safety || {}
   const pendingApprovalCount = Math.max(snap?.counts?.pendingApprovals || 0, 7)
   const highRiskCount = Math.max(approvals.filter((item) => item.risk === 'High').length, 3)
-  const totalPending = 41
+  const workflowBlockedCount = Array.isArray(statusSnap?.workflows)
+    ? statusSnap.workflows.filter((workflow) => (workflow.blocked_actions || []).length > 0).length
+    : 0
+  const totalPending = snap?.counts?.totalPending || pendingApprovalCount + manualCount + highRiskCount + workflowBlockedCount
+  const commandClock = useMemo(() => getCommandClock(statusSnap?.generatedAt), [statusSnap?.generatedAt])
   const selectCommand = useCallback((item, customNotice) => {
     setActiveCommand(item.id)
     setNotice(customNotice || `${item.label} 已選取。右側與底部狀態維持 read-only 顯示。`)
@@ -457,8 +467,8 @@ export default function MondayDashboard() {
           </div>
           <div className="hidden shrink-0 items-center gap-4 border-l border-cyan-300/10 pl-5 text-right lg:flex">
             <div>
-              <div className="text-lg font-semibold text-white">{COMMAND_CLOCK.time}</div>
-              <div className="text-[11px] text-slate-400">{COMMAND_CLOCK.date}</div>
+              <div className="text-lg font-semibold text-white">{commandClock.time}</div>
+              <div className="text-[11px] text-slate-400">{commandClock.date}</div>
             </div>
             <CircleDot className="h-5 w-5 text-slate-400" />
           </div>

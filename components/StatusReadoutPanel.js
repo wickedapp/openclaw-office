@@ -5,7 +5,9 @@ import { ChevronDown, RefreshCw, Square, Volume2, Waves } from 'lucide-react'
 
 const SOURCES = [
   ['overall', '總覽'],
+  ['monday', 'Monday'],
   ['departments', '部門'],
+  ['workflows', '工作流'],
   ['risks', '風險'],
   ['manual', '人手處理'],
   ['discord', 'Discord'],
