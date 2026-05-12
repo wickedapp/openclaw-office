@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Building2, Users, Shield, DollarSign, Activity, Database } from 'lucide-react'
+import { Building2, Users, Shield, DollarSign, Activity, Database, Calendar } from 'lucide-react'
 import IsometricOffice from '../components/IsometricOffice'
 import ActivityLog from '../components/ActivityLog'
 import RequestPipeline from '../components/RequestPipeline'
@@ -11,6 +11,7 @@ import TeamDashboard from '../components/TeamDashboard'
 import SecurityDashboard from '../components/SecurityDashboard'
 import DatabaseDashboard from '../components/DatabaseDashboard'
 import CostDashboard from '../components/CostDashboard'
+import MondayDashboard from '../components/MondayDashboard'
 
 const tabs = [
   { id: 'office', label: 'Main Office', icon: Building2 },
@@ -19,10 +20,11 @@ const tabs = [
   { id: 'cost', label: 'Cost Savings', icon: DollarSign },
   { id: 'security', label: 'Security', icon: Shield },
   { id: 'database', label: 'Database', icon: Database },
+  { id: 'monday', label: 'Monday', icon: Calendar },
 ]
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState('office')
+  const [activeTab, setActiveTab] = useState('monday')
   const [headerStats, setHeaderStats] = useState({
     tasks: 0,
     tokens: 0,
@@ -211,6 +213,17 @@ export default function Home() {
             exit={{ opacity: 0, y: -20 }}
           >
             <DatabaseDashboard />
+          </motion.div>
+        )}
+
+        {activeTab === 'monday' && (
+          <motion.div
+            key="monday"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+          >
+            <MondayDashboard />
           </motion.div>
         )}
       </AnimatePresence>

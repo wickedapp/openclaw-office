@@ -43,7 +43,7 @@ test.describe('App Launch & Layout', () => {
 test.describe('Tab Navigation', () => {
   const tabs = [
     'Main Office',
-    'Stats',
+    'Interaction Stats',
     'Agent Thoughts',
     'Cost Savings',
     'Security',
@@ -61,7 +61,7 @@ test.describe('Tab Navigation', () => {
 
   test('switching tabs rapidly works', async ({ page }) => {
     await page.goto('/', { waitUntil: 'domcontentloaded' });
-    for (const tab of ['Stats', 'Security', 'Main Office']) {
+    for (const tab of ['Interaction Stats', 'Security', 'Main Office']) {
       await page.getByRole('button', { name: tab, exact: true }).first().click();
       await page.waitForTimeout(200);
     }
@@ -126,16 +126,29 @@ test.describe('API Endpoints', () => {
     expect(body).toHaveProperty('messages');
   });
 
-  test('POST /api/tasks accepts task', async ({ request }) => {
+  test('POST /api/tasks creates task with current action contract', async ({ request }) => {
     const res = await request.post('/api/tasks', {
-      data: { task: 'test task', priority: 'low' },
+      data: { action: 'new_task', taskDetail: 'test task' },
     });
-    expect([200, 201]).toContain(res.status());
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({
+      success: true,
+      action: 'task_received',
+    });
+    expect(body.task).toMatchObject({
+      detail: 'test task',
+      status: 'received',
+      receivedBy: 'wickedman',
+    });
   });
 
-  test('GET /api/workflow/events returns SSE headers', async ({ request }) => {
-    const res = await request.get('/api/workflow/events');
+  test('GET /api/workflow?type=events returns event history JSON', async ({ request }) => {
+    const res = await request.get('/api/workflow?type=events');
     expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body).toHaveProperty('events');
+    expect(body).toHaveProperty('total');
   });
 
   test('GET /api/agents/sync returns agents', async ({ request }) => {
@@ -143,9 +156,9 @@ test.describe('API Endpoints', () => {
     expect(res.status()).toBe(200);
   });
 
-  test('GET /api/stats/history returns data', async ({ request }) => {
+  test('GET /api/stats/history is not exposed', async ({ request }) => {
     const res = await request.get('/api/stats/history');
-    expect(res.status()).toBe(200);
+    expect(res.status()).toBe(404);
   });
 });
 

@@ -3,8 +3,8 @@
 // Request = incoming message record (immutable after creation)
 // Task = work unit with independent lifecycle (pending → assigned → in_progress → completed/failed)
 
-import { analyzeTask, AGENTS, STATE_CONFIG } from '../../../lib/workflow'
-import { sendTelegramNotification, formatDelegationNotification } from '../../../lib/telegram'
+import { analyzeTask, AGENTS, STATE_CONFIG } from '../../../lib/workflow.js'
+import { sendTelegramNotification, formatDelegationNotification } from '../../../lib/telegram.js'
 import { 
   createRequest, 
   updateRequest, 
@@ -30,8 +30,10 @@ import {
   getActiveTasks,
   getRecentTasks,
   completeAllActiveTasks,
-} from '../../../lib/db'
-import { eventBus, EVENTS } from '../../../lib/event-bus'
+} from '../../../lib/db.js'
+import { eventBus, EVENTS } from '../../../lib/event-bus.js'
+import { routeAction } from '../../../lib/action-router/engine.js'
+import { TASK_TYPES } from '../../../lib/action-router/classifier.js'
 
 function timeStr() {
   return new Date().toLocaleTimeString('en-US', { 
@@ -104,6 +106,37 @@ function cleanContent(content) {
   return (content || '').replace(/^\[Telegram[^\]]*\]\s*/s, '').replace(/\[message_id:\s*\d+\]\s*$/, '').trim()
 }
 
+function dashboardRouteDecision(input, context = {}) {
+  const routedInput = context.notify
+    ? { ...input, taskType: TASK_TYPES.TELEGRAM_NOTIFICATION, source: 'dashboard' }
+    : { ...input, source: 'dashboard' }
+  return routeAction(routedInput, {
+    source: 'dashboard',
+    approval: context.approval || null,
+    liveMutationApproval: context.liveMutationApproval || context.live_mutation_approval || null,
+    preflight: context.preflight || null,
+    executionMode: 'decision_only',
+  })
+}
+
+function routeOnlyResponse(decision) {
+  return Response.json({
+    success: false,
+    routed: true,
+    decision,
+    selectedAgent: decision.selectedAgent,
+    requiredApproval: decision.approvalRequired,
+    preflightStatus: decision.preflightVerdict,
+    executionStatus: decision.executionStatus,
+    auditId: decision.auditId,
+    message: decision.blockedReason || 'Route decision requires manual review before execution.',
+  }, { status: 202 })
+}
+
+function shouldStopForRouter(decision) {
+  return decision.blocked || decision.mutationPermission || decision.selectedAgent === 'manual_review'
+}
+
 export async function GET(request) {
   const { searchParams } = new URL(request.url)
   const type = searchParams.get('type')
@@ -169,8 +202,15 @@ export async function POST(request) {
       const previousInChain = body.chainId ? findLastCompletedInChain(body.chainId) : null
       const isChainContinuation = !!previousInChain
 
-      const finalAgent = delegatedTo || agent
       const cleanText = cleanContent(content)
+      const routeDecision = dashboardRouteDecision({
+        action: 'start_flow',
+        text: cleanText,
+        requestedAgent: delegatedTo || agent,
+      }, body)
+      if (shouldStopForRouter(routeDecision)) return routeOnlyResponse(routeDecision)
+      const finalAgent = routeDecision.selectedAgent || delegatedTo || agent
+      const delegatedAgent = finalAgent !== agent ? finalAgent : delegatedTo
       
       // DEDUP: Check if we already have an entry for this message
       let req = null
@@ -222,8 +262,8 @@ export async function POST(request) {
       emitRequestUpdate(req.id)
 
       // Create Task with proper initial status
-      const taskStatus = delegatedTo ? 'pending' : 'in_progress'
-      const taskStartedAt = delegatedTo ? null : Date.now()
+      const taskStatus = delegatedAgent ? 'pending' : 'in_progress'
+      const taskStartedAt = delegatedAgent ? null : Date.now()
       const task = createTask({
         requestId: req.id,
         title: cleanText.slice(0, 80) + (cleanText.length > 80 ? '...' : ''),
@@ -244,7 +284,7 @@ export async function POST(request) {
       const chainDelay = isChainContinuation ? 2500 : 0
       const previousAgent = previousInChain?.assignedTo || null
 
-      if (delegatedTo && delegatedTo !== 'wickedman') {
+      if (delegatedAgent && delegatedAgent !== 'wickedman') {
         // Chain continuation: emit return animation event first
         if (isChainContinuation && previousAgent) {
           // Immediately emit chain_continue event so frontend can show return mail
@@ -284,8 +324,8 @@ export async function POST(request) {
         setTimeout(() => {
           const t = getTaskById(task.id)
           if (!t || t.status === 'completed' || t.status === 'failed') return
-          updateRequest(req.id, { state: 'task_created', task: { id: task.id, title: task.title, detail: task.detail, targetAgent: delegatedTo } })
-          createEvent(req.id, 'task_created', 'wickedman', `📋 Task → ${AGENTS[delegatedTo]?.emoji || '🤖'} ${AGENTS[delegatedTo]?.name || delegatedTo}: "${task.title}"`)
+          updateRequest(req.id, { state: 'task_created', task: { id: task.id, title: task.title, detail: task.detail, targetAgent: delegatedAgent } })
+          createEvent(req.id, 'task_created', 'wickedman', `📋 Task → ${AGENTS[delegatedAgent]?.emoji || '🤖'} ${AGENTS[delegatedAgent]?.name || delegatedAgent}: "${task.title}"`)
           emitRequestUpdate(req.id)
         }, chainDelay + 1200)
 
@@ -293,8 +333,8 @@ export async function POST(request) {
           const t = getTaskById(task.id)
           if (!t || t.status === 'completed' || t.status === 'failed') return
           updateTask(task.id, { status: 'assigned' })
-          updateRequest(req.id, { state: 'assigned', assignedTo: delegatedTo })
-          createEvent(req.id, 'assigned', delegatedTo, `📧 ${AGENTS[delegatedTo]?.emoji || '🤖'} ${AGENTS[delegatedTo]?.name || delegatedTo} taking over`)
+          updateRequest(req.id, { state: 'assigned', assignedTo: delegatedAgent })
+          createEvent(req.id, 'assigned', delegatedAgent, `📧 ${AGENTS[delegatedAgent]?.emoji || '🤖'} ${AGENTS[delegatedAgent]?.name || delegatedAgent} taking over`)
           emitRequestUpdate(req.id)
           emitTaskUpdate(task.id)
         }, chainDelay + 1800)
@@ -304,7 +344,7 @@ export async function POST(request) {
           if (!t || t.status === 'completed' || t.status === 'failed') return
           updateTask(task.id, { status: 'in_progress', startedAt: Date.now() })
           syncRequestStateFromTask(getTaskById(task.id))
-          createEvent(req.id, 'in_progress', delegatedTo, `⚡ ${AGENTS[delegatedTo]?.name || delegatedTo} working...`)
+          createEvent(req.id, 'in_progress', delegatedAgent, `⚡ ${AGENTS[delegatedAgent]?.name || delegatedAgent} working...`)
           emitRequestUpdate(req.id)
           emitTaskUpdate(task.id)
         }, chainDelay + 3500)
@@ -319,7 +359,7 @@ export async function POST(request) {
         }, 500)
       }
 
-      console.log(`[start_flow] ${adopted ? 'Adopted' : 'Created'} request ${req.id}, task ${task.id}: "${cleanText.slice(0, 50)}..." → ${finalAgent}${delegatedTo ? ' (delegated)' : ''}${isChainContinuation ? ` (chain continuation from ${previousAgent})` : ''}`)
+      console.log(`[start_flow] ${adopted ? 'Adopted' : 'Created'} request ${req.id}, task ${task.id}: "${cleanText.slice(0, 50)}..." → ${finalAgent}${delegatedAgent ? ' (delegated)' : ''}${isChainContinuation ? ` (chain continuation from ${previousAgent})` : ''}`)
 
       return Response.json({
         success: true,
@@ -329,9 +369,10 @@ export async function POST(request) {
         adopted,
         message: `Request created: ${content.slice(0, 50)}... → ${AGENTS[finalAgent]?.name || finalAgent}`,
         agent: finalAgent,
-        delegated: !!delegatedTo,
+        delegated: !!delegatedAgent,
         chainContinuation: isChainContinuation,
         previousAgent,
+        routeDecision,
       })
     }
 
@@ -448,10 +489,19 @@ export async function POST(request) {
       if (!content || !agent) {
         return Response.json({ error: 'content and agent are required' }, { status: 400 })
       }
+
+      const routeDecision = dashboardRouteDecision({
+        action: 'quick_flow',
+        taskType: notify ? TASK_TYPES.TELEGRAM_NOTIFICATION : undefined,
+        text: notify ? `send Telegram notification for ${content}` : content,
+        requestedAgent: agent,
+      }, body)
+      if (shouldStopForRouter(routeDecision)) return routeOnlyResponse(routeDecision)
+      const routedAgent = routeDecision.selectedAgent || agent
       
       // Send Telegram notification when delegating
-      if (notify && agent !== 'wickedman') {
-        const agentInfo = AGENTS[agent] || { name: agent, emoji: '🤖' }
+      if (notify && routedAgent !== 'wickedman') {
+        const agentInfo = AGENTS[routedAgent] || { name: routedAgent, emoji: '🤖' }
         const notifyMsg = formatDelegationNotification(agentInfo.name, agentInfo.emoji, content.slice(0, 100), notifyDetails)
         sendTelegramNotification(notifyMsg).catch(err => console.error('[quick_flow] Notification failed:', err))
       }
@@ -464,7 +514,7 @@ export async function POST(request) {
         req = findByTgMessageId(messageId)
         if (req) {
           webhookAdopted = true
-          updateRequest(req.id, { assignedTo: agent })
+          updateRequest(req.id, { assignedTo: routedAgent })
         }
       }
       
@@ -473,7 +523,7 @@ export async function POST(request) {
         if (pending && (pending.state === 'received' || pending.state === 'analyzing')) {
           req = pending
           webhookAdopted = true
-          updateRequest(req.id, { assignedTo: agent })
+          updateRequest(req.id, { assignedTo: routedAgent })
         }
       }
       
@@ -482,7 +532,7 @@ export async function POST(request) {
           id: `req_${Date.now()}`,
           content, from,
           state: 'received',
-          assignedTo: agent,
+          assignedTo: routedAgent,
           task: null,
           createdAt: Date.now(),
         })
@@ -500,7 +550,7 @@ export async function POST(request) {
         requestId,
         title: content.slice(0, 80) + (content.length > 80 ? '...' : ''),
         detail: content,
-        assignedAgent: agent,
+        assignedAgent: routedAgent,
         status: 'pending',
         createdAt: Date.now(),
       })
@@ -527,23 +577,23 @@ export async function POST(request) {
       // Task created
       setTimeout(() => {
         if (!canAdvanceTask(task.id)) return
-        updateTask(task.id, { status: 'assigned', assignedAgent: agent })
-        updateRequest(requestId, { state: 'task_created', task: { id: task.id, title: task.title, detail: task.detail, targetAgent: agent, reason: reason || 'Assigned by WickedMan' } })
+        updateTask(task.id, { status: 'assigned', assignedAgent: routedAgent })
+        updateRequest(requestId, { state: 'task_created', task: { id: task.id, title: task.title, detail: task.detail, targetAgent: routedAgent, reason: reason || 'Assigned by Action Router' } })
         emitRequestUpdate(requestId)
         emitTaskUpdate(task.id)
-        createEvent(requestId, 'task_created', 'wickedman', `📋 Task created → ${AGENTS[agent]?.name || agent}: ${reason || 'Assigned by WickedMan'}`)
+        createEvent(requestId, 'task_created', 'wickedman', `📋 Task created → ${AGENTS[routedAgent]?.name || routedAgent}: ${reason || 'Assigned by Action Router'}`)
       }, baseDelay + 1500)
       
       // Assigned
       setTimeout(() => {
         if (!canAdvanceTask(task.id)) return
-        updateRequest(requestId, { state: 'assigned', assignedTo: agent })
+        updateRequest(requestId, { state: 'assigned', assignedTo: routedAgent })
         emitRequestUpdate(requestId)
-        const isSelf = agent === 'wickedman'
+        const isSelf = routedAgent === 'wickedman'
         const r = getRequestById(requestId)
         createEvent(requestId, 'assigned', 'wickedman', 
-          isSelf ? `📧 Taking this one myself: "${r?.task?.title}"` : `📧 Delegating to ${AGENTS[agent]?.name || agent}: "${r?.task?.title}"`,
-          { targetAgent: agent }
+          isSelf ? `📧 Taking this one myself: "${r?.task?.title}"` : `📧 Delegating to ${AGENTS[routedAgent]?.name || routedAgent}: "${r?.task?.title}"`,
+          { targetAgent: routedAgent }
         )
       }, baseDelay + 2300)
       
@@ -554,7 +604,7 @@ export async function POST(request) {
         syncRequestStateFromTask(getTaskById(task.id))
         emitRequestUpdate(requestId)
         emitTaskUpdate(task.id)
-        createEvent(requestId, 'in_progress', agent, `⚡ Working on: "${task.title}"`)
+        createEvent(requestId, 'in_progress', routedAgent, `⚡ Working on: "${task.title}"`)
       }, baseDelay + 3300)
       
       // Complete (only if autoComplete)
@@ -568,9 +618,9 @@ export async function POST(request) {
           syncRequestStateFromTask(getTaskById(task.id))
           emitRequestUpdate(requestId)
           emitTaskUpdate(task.id)
-          recordTaskCompletion(agent, taskTimeMs)
+          recordTaskCompletion(routedAgent, taskTimeMs)
           incrementMessages('sent')
-          createEvent(requestId, 'completed', agent, `✅ Completed: "${task.title}"`)
+          createEvent(requestId, 'completed', routedAgent, `✅ Completed: "${task.title}"`)
         }, baseDelay + 3300 + workDurationMs)
       }
       
@@ -578,8 +628,9 @@ export async function POST(request) {
         success: true,
         requestId,
         taskId: task.id,
-        message: `Workflow started: ${content.slice(0, 50)}... → ${AGENTS[agent]?.name || agent}`,
-        agent,
+        message: `Workflow started: ${content.slice(0, 50)}... → ${AGENTS[routedAgent]?.name || routedAgent}`,
+        agent: routedAgent,
+        routeDecision,
         estimatedCompletionMs: autoComplete ? 4100 + workDurationMs : null,
       })
     }

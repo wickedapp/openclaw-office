@@ -9,6 +9,8 @@ import { eventBus, EVENTS } from '../../../lib/event-bus.js'
 import { AGENTS, STATE_CONFIG } from '../../../lib/workflow.js'
 import { sendTelegramNotification, formatDelegationNotification } from '../../../lib/telegram.js'
 import { getStatus, setCurrentRequest, getCurrentRequest } from '../../../lib/openclaw-ws.js'
+import { routeAction } from '../../../lib/action-router/engine.js'
+import { TASK_TYPES } from '../../../lib/action-router/classifier.js'
 
 function timeStr() {
   return new Date().toLocaleTimeString('en-US', { 
@@ -62,6 +64,35 @@ export async function POST(request) {
       if (!agent) {
         return Response.json({ error: 'agent is required' }, { status: 400 })
       }
+
+      const routeDecision = routeAction({
+        source: 'dashboard',
+        action: 'assign',
+        taskType: notify ? TASK_TYPES.TELEGRAM_NOTIFICATION : undefined,
+        text: notify ? `send Telegram notification for ${(content || reason || agent || 'assignment')}` : (content || reason || agent),
+        requestedAgent: agent,
+      }, {
+        source: 'dashboard',
+        approval: body.approval || null,
+        liveMutationApproval: body.liveMutationApproval || body.live_mutation_approval || null,
+        preflight: body.preflight || null,
+        executionMode: 'decision_only',
+      })
+      if (routeDecision.blocked || routeDecision.mutationPermission || routeDecision.selectedAgent === 'manual_review') {
+        return Response.json({
+          success: false,
+          routed: true,
+          decision: routeDecision,
+          selectedAgent: routeDecision.selectedAgent,
+          requiredApproval: routeDecision.approvalRequired,
+          preflightStatus: routeDecision.preflightVerdict,
+          executionStatus: routeDecision.executionStatus,
+          auditId: routeDecision.auditId,
+          message: routeDecision.blockedReason || 'Route decision requires manual review before execution.',
+        }, { status: 202 })
+      }
+
+      const routedAgent = routeDecision.selectedAgent || agent
       
       // Find or create the request
       let req = null
@@ -111,17 +142,17 @@ export async function POST(request) {
         id: `task_${Date.now()}`,
         title: (content || req.content).slice(0, 50),
         detail: content || req.content,
-        targetAgent: agent,
+        targetAgent: routedAgent,
         reason: reason || 'Assigned by WickedMan',
       }
       
       updateRequest(req.id, { 
         state: 'task_created', 
         task,
-        assignedTo: agent,
+        assignedTo: routedAgent,
       })
       
-      const agentInfo = AGENTS[agent] || { name: agent, emoji: '🤖' }
+      const agentInfo = AGENTS[routedAgent] || { name: routedAgent, emoji: '🤖' }
       createDashboardEvent(req.id, 'task_created', 'wickedman', 
         `📋 Task created → ${agentInfo.name}: ${reason || 'Assigned'}`)
       emitRequestUpdate(req.id)
@@ -129,7 +160,7 @@ export async function POST(request) {
       // Animate assignment after short delay
       setTimeout(() => {
         updateRequest(req.id, { state: 'assigned' })
-        createDashboardEvent(req.id, 'assigned', agent, 
+        createDashboardEvent(req.id, 'assigned', routedAgent, 
           `${agentInfo.emoji} ${agentInfo.name} received task`)
         emitRequestUpdate(req.id)
         
@@ -138,7 +169,7 @@ export async function POST(request) {
           const current = getRequestById(req.id)
           if (current && current.state === 'assigned') {
             updateRequest(req.id, { state: 'in_progress' })
-            createDashboardEvent(req.id, 'in_progress', agent, 
+            createDashboardEvent(req.id, 'in_progress', routedAgent, 
               `⚡ ${agentInfo.name} working...`)
             emitRequestUpdate(req.id)
           }
@@ -146,7 +177,7 @@ export async function POST(request) {
       }, 1000)
       
       // Send Telegram notification if requested
-      if (notify && agent !== 'wickedman') {
+      if (notify && routedAgent !== 'wickedman') {
         const notifyMsg = formatDelegationNotification(
           agentInfo.name,
           agentInfo.emoji,
@@ -164,7 +195,8 @@ export async function POST(request) {
       return Response.json({
         success: true,
         requestId: req.id,
-        agent,
+        agent: routedAgent,
+        routeDecision,
         message: `Task assigned to ${agentInfo.name}`,
       })
     }
